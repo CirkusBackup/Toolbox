@@ -1,86 +1,119 @@
 import os
 import maya.cmds as cmds
 import subprocess
+from textwrap import dedent
 
-def submitToSmedge(packetSize,priority,sim,foam,mesh):
 
-    #Query values from UI
+def _maya_batch_exe() -> str:
+    """Returns the location of the maya batch executable"""
+    return f'{os.getenv("MAYA_LOCATION")}\\bin\\mayabtach.exe'
+
+
+def submitToSmedge(packetSize: int, priority: int, sim: bool, foam: bool, mesh: bool):
+    # Query values from UI
 
     submit = 'C:/Program Files/Smedge/Submit.exe'
-    dir = submit.rsplit('/',1)[0]
+    working_dir = submit.rsplit('/', 1)[0]
 
-    #set the working dir and PATH to the directory
-    os.chdir(dir)
-    os.putenv("PATH",dir)
-    #now set submit to just the basename of the executable
-    submit = submit.rsplit('/',1)[1]
+    # set the working dir and PATH to the directory
+    os.chdir(working_dir)
+    os.putenv("PATH", working_dir)
+    # now set submit to just the basename of the executable
+    submit = submit.rsplit('/', 1)[1]
 
-    #get start and end frames from timeline
-    startFrameFloat = cmds.playbackOptions(q=True,minTime=True)
-    startFrame = str('{0:g}'.format(startFrameFloat))
-    endFrameFloat = cmds.playbackOptions(q=True,maxTime=True)
-    endFrame = str('{0:g}'.format(endFrameFloat))
+    # get start and end frames from timeline
+    startFrameFloat = cmds.playbackOptions(q=True, minTime=True)
+    startFrame = str(f'{startFrameFloat:g}')
+    endFrameFloat = cmds.playbackOptions(q=True, maxTime=True)
+    endFrame = str(f'{endFrameFloat:g}')
 
-    #set naming
-    filename = cmds.file(q=True,sn=True)
-    shortname = cmds.file(q=True,sn=True,shn=True)
-    smedgeName = 'bifrost: %s'%shortname.split('.')[0]
-    extra = ''
-    jobID = ''
+    # set naming
+    filename: str = cmds.file(q=True, sn=True)
+    shortname: str = cmds.file(q=True, sn=True, shn=True)
+    smedgeName: str = f'bifrost: {shortname.split(".")[0]}'
+    extra: str = ''
+    jobID: str = ''
+    bifrostLiquidContainer = ''  # TODO get the bifrost container to set it's attributes
 
-    #mesh cache
-    cmds.setAttr('%s.liquidmeshCacheControl'%bifrostLiquidContainer,0)
-    cmds.setAttr('%s.enableLiquidMeshCache'%bifrostLiquidContainer,0)
-    cmds.setAttr('%s.liquidmeshCachePath'%bifrostLiquidContainer,'',type="string")
-    cmds.setAttr('%s.liquidmeshCacheFileName'%bifrostLiquidContainer,'',type="string")
+    # mesh cache
+    cmds.setAttr(f'{bifrostLiquidContainer}.liquidmeshCacheControl', 0)
+    cmds.setAttr(f'{bifrostLiquidContainer}.enableLiquidMeshCache', 0)
+    cmds.setAttr(f'{bifrostLiquidContainer}.liquidmeshCachePath', '', type="string")
+    cmds.setAttr(f'{bifrostLiquidContainer}.liquidmeshCacheFileName', '', type="string")
 
-    #check what to do
-    if sim == 1: 
+    # check what to do
+    if sim:
         extra = '-UsageLimit 1 -DistributeMode \"Forward\"'
-        #clear cache inputs
+        # clear cache inputs
         if mesh == 1:
-            #liquid cache
-            cmds.setAttr('%s.enableLiquidCache'%bifrostLiquidContainer,0)
-            cmds.setAttr('%s.liquidCacheControl'%bifrostLiquidContainer,0)
-            cmds.setAttr('%s.liquidCachePath'%bifrostLiquidContainer,'',type="string")
-            cmds.setAttr('%s.liquidCacheFileName'%bifrostLiquidContainer,'',type="string")
-            #solid cache
-            cmds.setAttr('%s.enableSolidCache'%bifrostLiquidContainer,0)
-            cmds.setAttr('%s.solidCacheControl'%bifrostLiquidContainer,0)
-            cmds.setAttr('%s.solidCachePath'%bifrostLiquidContainer,'',type="string")
-            cmds.setAttr('%s.solidCacheFileName'%bifrostLiquidContainer,'',type="string")
-        
-        #set variables on bifrost nodes
-        #turn mesh off
-        #turn evaluate on
-        #evaluation type to simulation
-        #clear all cache variables
+            # liquid cache
+            cmds.setAttr(f'{bifrostLiquidContainer}.enableLiquidCache', 0)
+            cmds.setAttr(f'{bifrostLiquidContainer}.liquidCacheControl', 0)
+            cmds.setAttr(f'{bifrostLiquidContainer}.liquidCachePath', '', type="string")
+            cmds.setAttr(f'{bifrostLiquidContainer}.liquidCacheFileName', '', type="string")
+            # solid cache
+            cmds.setAttr(f'{bifrostLiquidContainer}.enableSolidCache', 0)
+            cmds.setAttr(f'{bifrostLiquidContainer}.solidCacheControl', 0)
+            cmds.setAttr(f'{bifrostLiquidContainer}.solidCachePath', '', type="string")
+            cmds.setAttr(f'{bifrostLiquidContainer}.solidCacheFileName', '', type="string")
 
-        #save file
-        cmds.file(rename='%s.sim'%(filename.rsplit('.',1)[0]))
+        # set variables on bifrost nodes
+        # turn mesh off
+        # turn evaluate on
+        # evaluation type to simulation
+        # clear all cache variables
+
+        # save file
+        cmds.file(rename='%s.sim' % (filename.rsplit('.', 1)[0]))
         cmds.file(save=True)
-        #submit string
-        cmd = '%s Script -Type \"Generic Script\" -Name \"%s - SIM\" -Priority %s %s -Pool \"Redshift\" -ErrorStarts \"Failed\" -Range \"%s-%s\" -PacketSize %s -Command \\\"C:\\Program Files\\Autodesk\\Maya2019\\bin\\mayabatch.exe\\\" \\\"%s.sim.mb\\\" \\\"-command\\\" \\\"MeshBifrost($(SubRange.Start),$(SubRange.End),%s,%s,%s)\\\"'%(submit,smedgeName,priority,extra,startFrame,endFrame,packetSize,filename.rsplit('.',1)[0],sim,foam,mesh)
-        print cmd
-        #do it
-        jobID = subprocess.check_output(cmd,stdin=None,stderr=None,shell=False)
-        print jobID.split(' ')[-1]
-        
-    if mesh == 1: 
-        extra = '-WaitForJobID %s -WaitForWholeJob 0'%jobID.split(' ')[-1]
+        # submit string
+
+        cmd = dedent(f'''
+        {submit} Script
+        -Type "Generic Script"
+        -Name "{smedgeName} - SIM"
+        -Priority {priority} {extra}
+        -Pool "Redshift"
+        -ErrorStarts "Failed"
+        -Range "{startFrame}-{endFrame}"
+        -PacketSize {packetSize}
+        -Command "{_maya_batch_exe()}" "{filename.split('.', 1)[0]}"
+        "-command" "MeshBifrost($(SubRange.Start),$(SubRange.End),{int(sim)},{int(foam)},{int(mesh)})"
+        ''').replace('\n', ' ')
+
+        print(cmd)
+        # do it
+        jobID = subprocess.check_output(cmd, stdin=None, stderr=None, shell=False)
+        print(str(jobID).split(' ')[-1])
+
+    if mesh:
+        extra = f'-WaitForJobID {jobID.split(" ")[-1]} -WaitForWholeJob 0'
         if sim == 1:
-            print 'wait for sim to finish'
-            #extra = 'wait for sim to finish'
-        cmds.file(rename='%s.mesh'%(filename.rsplit('.',1)[0]))
+            print('wait for sim to finish')
+            # extra = 'wait for sim to finish'
+        cmds.file(rename=f'{filename.rsplit(".", 1)[0]}.mesh')
         cmds.file(save=True)
-        #submit string
-        cmd = '%s Script -Type \"Generic Script\" -Paused -Name \"%s - MESH\" -Priority %s %s -Pool \"Redshift\" -ErrorStarts \"Failed\" -Range \"%s-%s\" -PacketSize %s -Command \\\"C:\\Program Files\\Autodesk\\Maya2019\\bin\\mayabatch.exe\\\" \\\"%s.mesh.mb\\\" \\\"-command\\\" \\\"MeshBifrost($(SubRange.Start),$(SubRange.End),%s,%s,%s)\\\"'%(submit,smedgeName,priority,extra,startFrame,endFrame,packetSize,filename.rsplit('.',1)[0],sim,foam,mesh)
-        print cmd
-        #do it
-        result = subprocess.check_output(cmd,stdin=None,stderr=None,shell=False)
+        # submit string
+        cmd = dedent(f'''
+        {submit} Script
+        -type "Generic Script"
+        -Paused
+        -Name "{smedgeName} - MESH"
+        -Priority {priority} {extra}
+        -Pool "Redshift"
+        -ErrorStarts "Failed"
+        -Range "{startFrame}-{endFrame}"
+        -Command "{_maya_batch_exe()}" "{filename.rsplit('.', 1)[0]}"
+        "-command" "MeshBifrost($(SubRange.Start),$(SubRange.End),{int(sim)},{int(foam)},{int(mesh)})"
+        ''').replace('\n', ' ')
 
-    #set filename back      
-    cmds.file(rename=filename) 
+        print(cmd)
+        # do it
+        result = subprocess.check_output(cmd, stdin=None, stderr=None, shell=False)
+
+    # set filename back
+    cmds.file(rename=filename)
     cmds.file(save=True)
 
-submitToSmedge(4,100,1,0,1)
+
+submitToSmedge(4, 100, True, False, True)
