@@ -73,7 +73,6 @@
 			{
 				"icon":"loopBox.svg",
 				"label":"loops through attributes",
-				"command":"source loopBox;loopBox;\\n\/*\\nstring $sel[] = `ls -sl`;\\nfor( $item in $sel)\\n{\\n\\n};",
 				"script":"mel/loopBox.mel",
 				"command":"source loopBox;loopBox;",
 				"stp":"mel"
@@ -152,8 +151,7 @@
 						"stp":"python"
 					}
 					
-				],
-				"stp":"python"
+				]
 			},
 			{
 				"icon":"multiRef.svg",
