@@ -58,29 +58,31 @@ def downloadFile(remote: str, local: str):
     ''''
     Downloads a file from online somewhere into a local file.
     '''
-    filePath = local.rsplit('/', 1)
+    file_path = local.rsplit('/', 1)
 
     # Create the local dirs if not there
-    if len(filePath) > 1:
-        if not os.path.exists(f'{filePath[0]}'):
-            os.makedirs(filePath[0])
-
-    print(f'Downloading {totalSize} bytes...')
+    if len(file_path) > 1:
+        if not os.path.exists(f'{file_path[0]}'):
+            os.makedirs(file_path[0])
 
     # Write the file to disk
     with request.urlopen(remote) as req:
         head = req.info()
         
-        totalSize = head['Content-Length']
-        blockSize = 8192
-        curBlock = 0
+        total_size = head['Content-Length']
+        block_size = 8192
+        cur_block = 0
+
+        print(f'Downloading {total_size} bytes...')
+
+        # Start downloading chunks
         with open(local, 'wb') as file:
             while True:
-                chunk = req.read(blockSize)
+                chunk = req.read(block_size)
                 if not chunk: break
                 file.write(chunk)
-                curBlock += 1
-                percent = int(curBlock * blockSize * 100 / totalSize)
+                cur_block += 1
+                percent = int(cur_block * block_size * 100 / total_size)
                 if percent > 100:
                     percent = 100
                 print('%2d%%'.format(percent))
