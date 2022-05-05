@@ -6,7 +6,7 @@ def openAnimaticFile(relativePath):
 	# path to the directory 
 	myWorkspace = cmds.workspace( q=True, fullName=True )
 	jobFolder = myWorkspace.rsplit('/',1)[0]
-	dirpath = '%s/%s'%(jobFolder,relativePath)
+	dirpath = f'{jobFolder}/{relativePath}'
 
 	# get all entries in the directory w/ stats
 	entries = (os.path.join(dirpath, fn) for fn in os.listdir(dirpath))
