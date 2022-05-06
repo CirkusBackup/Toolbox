@@ -55,9 +55,9 @@ def removeButton(shelfName, iconName):
 
 
 def downloadFile(remote: str, local: str):
-    ''''
+    """'
     Downloads a file from online somewhere into a local file.
-    '''
+    """
     file_path = local.rsplit('/', 1)
 
     # Create the local dirs if not there
@@ -68,7 +68,7 @@ def downloadFile(remote: str, local: str):
     # Write the file to disk
     with request.urlopen(remote) as req:
         head = req.info()
-        
+
         total_size = head['Content-Length']
         block_size = 8192
         cur_block = 0
@@ -120,7 +120,7 @@ def checkGroups(shelfName):
 
         addIcons(shelfName, allButtons)
         cmds.deleteUI('Install Toolbox')
-    except:
+    except Exception:
         pass
 
 
@@ -131,7 +131,7 @@ def addIcons(shelfName, buttons):
 
     # resize progress bar
     cmds.progressBar('progressControl', edit=True,
-                     vis=True, maxValue=len(buttons)-1)
+                     vis=True, maxValue=len(buttons) - 1)
 
     # loop through dictionary
     for i, btn in enumerate(buttons):
@@ -151,8 +151,8 @@ def addIcons(shelfName, buttons):
                     downloadFile(f'{_GITHUB_RAW}icons/{ico}',
                                  f'{localIconsPath}/{ico}')
                     if ii == 0:
-                        shelfString += ',i1=\''+ico+'\''
-        except:
+                        shelfString += ',i1=\'' + ico + '\''
+        except Exception:
             print('file not available')
             # set icon to default button because image can not be downloaded
             shelfString += ',i1=\'commandButton.png\''
@@ -165,7 +165,7 @@ def addIcons(shelfName, buttons):
 
                 downloadFile(f'{_GITHUB_RAW}{script}',
                              f'{localScriptsPath}/{script}')
-            except:
+            except Exception:
                 print('file not available')
         # download modules from github
         if scriptsMenuI > 1:
@@ -174,26 +174,26 @@ def addIcons(shelfName, buttons):
                 for mod in modules:
                     downloadFile(f'{_GITHUB_RAW}{mod}',
                                  f'{localScriptsPath}/{mod}')
-            except:
+            except Exception:
                 print('file not available')
         try:
             label = buttons[i]['label']
             shelfString += f',l=\'{label}\''
-        except:
+        except Exception:
             label = ''
         try:
             com = buttons[i]['command']
             shelfString += f',c=\'{com}\''
-        except:
+        except Exception:
             com = ''
         try:
             stp = buttons[i]['stp']
             shelfString += f',stp=\'{stp}\''
-        except:
-            #shelfString += ',stp=\'mel\''
+        except Exception:
+            # shelfString += ',stp=\'mel\''
             print('using mel')
 
-        shelfString += ',w=32,h=32,p=\''+shelfName+'\')'
+        shelfString += ',w=32,h=32,p=\'' + shelfName + '\')'
 
         # remove old button
         if label:
@@ -207,7 +207,7 @@ def addIcons(shelfName, buttons):
             for i, l in enumerate(mi):
                 cmds.shelfButton(currentButton, edit=True, mi=(
                     mi[i]['label'], mi[i]['command']))
-        except:
+        except Exception:
             pass
 
 
@@ -241,7 +241,7 @@ def updateGrpCheckboxes():
         children = cmds.columnLayout('listLayout', q=True, ca=True)
         for c in children:
             cmds.deleteUI(c)
-    except:
+    except Exception:
         pass
 
     JSONPath = cmds.textField('jsonPathText', q=True, tx=True)
@@ -257,16 +257,16 @@ def updateGrpCheckboxes():
                     cmds.checkBox(cb, e=True, v=0)
                 if data[k]["checkStatus"] == 2:
                     cmds.checkBox(cb, e=True, v=1, ed=0)
-            except:
+            except Exception:
                 pass
-    except:
+    except Exception:
         pass
 
 
 def installToolboxWindow():
     installForm = cmds.formLayout()
     textLabel = cmds.text(label='Shelf')
-    nameText = cmds.textField('nameText', width=200, tx='Custom')
+    nameText = cmds.textField('nameText', width=200, tx='CoolTool')
     scriptsMenu = cmds.optionMenu('scriptsMenu')
     jsonPathText = cmds.textField('jsonPathText', ed=False, pht='path to json')
     jsonPathBtn = cmds.button('jsonPathBtn', width=50,
@@ -275,11 +275,11 @@ def installToolboxWindow():
     scriptsPaths = os.getenv('MAYA_SCRIPT_PATH')
     allparts = scriptsPaths.split(separator)
     for i, part in enumerate(allparts):
-        if (i == 0):
+        if i == 0:
             cmds.menuItem(label='Manually install scripts')
-        if (i < 7):
+        if i < 7:
             isSystemPath = filterOutSystemPaths(part)
-            if (isSystemPath == 0):
+            if isSystemPath == 0:
                 cmds.menuItem(label=part)
 
     iconsMenu = cmds.optionMenu('iconsMenu')
@@ -287,9 +287,9 @@ def installToolboxWindow():
     iconsParts = iconsPaths.split(separator)
 
     for i, part in enumerate(iconsParts):
-        if (i < 6):
+        if i < 6:
             isSystemPath = filterOutSystemPaths(part)
-            if (isSystemPath == 0):
+            if isSystemPath == 0:
                 cmds.menuItem(label=part)
 
     progressControl = cmds.progressBar(
@@ -303,7 +303,7 @@ def installToolboxWindow():
 
     try:
         dirname = os.path.dirname(__file__)
-    except:
+    except Exception:
         print('running in test environment')
         dirname = 'C:/Users/Admin/Documents/Toolbox'
 
@@ -319,12 +319,12 @@ def installToolboxWindow():
                     cmds.checkBox(cb, e=True, v=0)
                 if data[k]["checkStatus"] == 2:
                     cmds.checkBox(cb, e=True, v=1, ed=0)
-            except:
+            except Exception:
                 pass
-    except:
+    except Exception:
         pass
 
-    cmds.formLayout(installForm,  edit=True,
+    cmds.formLayout(installForm, edit=True,
                     attachForm=[
                         (textLabel, 'top', 15),
                         (textLabel, 'left', 10),
@@ -361,26 +361,15 @@ def installToolboxWindow():
                     ]
                     )
 
-    shelfName = ''
-    # get current tab
-    names = cmds.layout('ShelfLayout', q=True, ca=True)
-    shelfIndex = cmds.shelfTabLayout(
-        'ShelfLayout', query=True, selectTabIndex=True)
-
-    # set text
-    selectionString = (names[shelfIndex-1])
-    cmds.textField(nameText, edit=True, tx=selectionString)
-
 
 def toolbox_install():
     workspaceName = 'Install Toolbox'
-    if(cmds.workspaceControl('Install Toolbox', exists=True)):
+    if (cmds.workspaceControl('Install Toolbox', exists=True)):
         cmds.deleteUI('Install Toolbox')
     cmds.workspaceControl(workspaceName, initialHeight=250,
                           initialWidth=200, uiScript='installToolboxWindow()')
 
-
 # toolbox_install()
 
-#import installToolbox
+# import installToolbox
 # installToolbox.toolbox_install()
