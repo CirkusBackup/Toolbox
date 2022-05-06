@@ -1,9 +1,9 @@
-global proc installToolbox(){
+global proc installToolbox() {
 	python("" 
 	+ "import installToolbox;"
 	+ "import importlib;"
 	+ "importlib.reload(installToolbox);"
 	+ "from installToolbox import *;"
 	+ "installToolbox.toolbox_install()"
-	)
+	);
 }
