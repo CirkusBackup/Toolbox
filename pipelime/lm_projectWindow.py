@@ -38,11 +38,11 @@ def createButton():
     elif projectName:
         projectRoot = '%s/%s' % (parentFolder, projectName)
 
-    folderStructureDict = loadSave.loadDictionary('%s/pipelime/lm_folderStructure.json' % qtBase.self_path())
+    folderStructureDict = loadSave.loadDictionary(f'{qtBase.self_path()}/pipelime/lm_folderStructure.json')
 
     # create general folders
     for i in folderStructureDict["general"]["folders"]:
-        folderNames.append('%s/%s' % (projectRoot, i))
+        folderNames.append(f'{projectRoot}/{i}')
 
     # perform options
     checkBoxes = [[lm_projectWin.mainWidget.checkBox_3D, '3D'], [lm_projectWin.mainWidget.checkBox_anim, 'anim'],
@@ -59,11 +59,11 @@ def createButton():
             # create folders
             for i in folderStructureDict["options"][c[1]]["folders"]:
                 if '<var>' not in i:
-                    folderNames.append('%s/%s' % (projectRoot, i))
+                    folderNames.append(f'{projectRoot}/{i}')
                 else:
                     for v in varients:
                         vi = i.replace('<var>', v)
-                        folderNames.append('%s/%s' % (projectRoot, vi))
+                        folderNames.append(f'{projectRoot}/{vi}')
 
     # make all of the folders
     makeFolders(folderNames)
@@ -73,13 +73,13 @@ def createButton():
             # copy files
             try:
                 for i in folderStructureDict["options"][c[1]]["files"]:
-                    sourcePath = '%s/pipelime/files' % qtBase.self_path()
-                    sourceFile = '%s/%s' % (sourcePath, i["source"])
-                    destFile = '%s/%s/%s' % (projectRoot, i["dest"], i["source"])
+                    sourcePath = f'{qtBase.self_path()}/pipelime/files'
+                    sourceFile = f'{sourcePath}/{i["source"]}'
+                    destFile = f'{projectRoot}/{i["dest"]}/{i["source"]}'
                     sourceFile = os.path.realpath(sourceFile)
                     destFile = os.path.realpath(destFile)
                     shutil.copyfile(sourceFile, destFile)
-            except:
+            except Exception:
                 pass
 
     # set prefs for project
