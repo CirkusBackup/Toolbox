@@ -1,1 +1,0 @@
-python3.6 /media/bigtop/Job_3/System/Deployment/py/sendEmail3.py -n "$(Scene.File)" -cam $(Extra.-cam) -rl $(Extra.-rl) -rs $(SubRange.Start) -re $(SubRange.End) -p $(PercentDone) -ft "$(CurrentTime)" -fd "$(CurrentDate)" -sp $(Scene.Path.Enquote) -jn "$(Name)"
