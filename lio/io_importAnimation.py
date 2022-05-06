@@ -2,48 +2,50 @@ import maya.cmds as cmds
 import maya.mel as mel
 import lio
 
-def importAnimation(silent,selectedABC):
 
-    #check if plug is already loaded
-    if not cmds.pluginInfo('AbcExport',query=True,loaded=True):
+def importAnimation(silent, selectedABC):
+    # check if plug is already loaded
+    if not cmds.pluginInfo('AbcExport', query=True, loaded=True):
         try:
-            #load abcExport plugin
-            cmds.loadPlugin( 'AbcExport' )
-        except: cmds.error('Could not load AbcExport plugin')
+            # load abcExport plugin
+            cmds.loadPlugin('AbcExport')
+        except:
+            cmds.error('Could not load AbcExport plugin')
 
-    myWorkspace = cmds.workspace( q=True, fullName=True )
-    myAlembics = myWorkspace+'/cache/alembic'
+    myWorkspace = cmds.workspace(q=True, fullName=True)
+    myAlembics = myWorkspace + '/cache/alembic'
 
     basicFilter = "*.abc"
-    selectedABC += cmds.fileDialog2(fm=4,fileFilter=basicFilter, dir=myAlembics)
+    selectedABC += cmds.fileDialog2(fm=4, fileFilter=basicFilter, dir=myAlembics)
 
-    #create top level group
+    # create top level group
     if cmds.objExists('|ANIM') == 0:
-        newRootGroup = cmds.group(em=True,n='ANIM')
+        newRootGroup = cmds.group(em=True, n='ANIM')
 
     existingObjs = cmds.ls(transforms=True)
 
     for abc in selectedABC:
-        grpName = '%s_GRP'%abc.split('/')[-1].split('.')[0]
-        print grpName
-    
-        newGroup = cmds.group(em=True,n=grpName)
-        cmds.parent(newGroup,'|ANIM')
-        command = "AbcImport -reparent \"|ANIM|"+newGroup+"\" -mode import \""+abc+"\""
+        grpName = '%s_GRP' % abc.split('/')[-1].split('.')[0]
+        print(grpName)
+
+        newGroup = cmds.group(em=True, n=grpName)
+        cmds.parent(newGroup, '|ANIM')
+        command = "AbcImport -reparent \"|ANIM|" + newGroup + "\" -mode import \"" + abc + "\""
         mel.eval(command)
 
     updatedObjs = cmds.ls(transforms=True)
 
     newObjs = [x for x in updatedObjs if x not in existingObjs]
-    cmds.select(newObjs,r=True)
+    cmds.select(newObjs, r=True)
 
-    #import materials
+    # import materials
     lio.io_importMaterials.assignMaterials()
 
-    #remove curves
-    
-    #remove empty groups
-    
+    # remove curves
+
+    # remove empty groups
+
+
 '''
 def importAnim(filename):
     command = "AbcImport -mode import \""+filename+"\""; 
@@ -58,5 +60,5 @@ def importAnimDialog():
     if (filename):
         importAnim(filename[0])
 '''
-#empty = []
-#importAnimation(0,empty);
+# empty = []
+# importAnimation(0,empty);
