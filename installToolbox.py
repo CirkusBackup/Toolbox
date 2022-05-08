@@ -20,7 +20,7 @@ def createShelf(shelfName):
         print(f'Shelf {shelfName} exists.')
     else:
         print(f'Shelf {shelfName} does not exist. Creating new shelf.')
-        mel.eval(f'addnewShelfTab(\"{shelfName}\");')
+        mel.eval(f'addNewShelfTab(\"{shelfName}\");')
 
 
 def removeSeparator(shelfName, iconName):
@@ -364,7 +364,7 @@ def installToolboxWindow():
 
 def toolbox_install():
     workspaceName = 'Install Toolbox'
-    if (cmds.workspaceControl('Install Toolbox', exists=True)):
+    if cmds.workspaceControl('Install Toolbox', exists=True):
         cmds.deleteUI('Install Toolbox')
     cmds.workspaceControl(workspaceName, initialHeight=250,
                           initialWidth=200, uiScript='installToolboxWindow()')
