@@ -69,7 +69,7 @@ def downloadFile(remote: str, local: str):
     with request.urlopen(remote) as req:
         head = req.info()
 
-        total_size = head['Content-Length']
+        total_size = int(head['Content-Length'])
         block_size = 8192
         cur_block = 0
 
