@@ -73,7 +73,7 @@ def downloadFile(remote: str, local: str):
         block_size = 8192
         cur_block = 0
 
-        print(f'Downloading {total_size} bytes...')
+        print(f'Starting download of file {remote} ({total_size} bytes)...')
 
         # Start downloading chunks
         with open(local, 'wb') as file:
@@ -85,12 +85,11 @@ def downloadFile(remote: str, local: str):
                 percent = int(cur_block * block_size * 100 / total_size)
                 if percent > 100:
                     percent = 100
-                print('%2d%%'.format(percent))
+                print(f'    {percent:.2f}%')
                 if percent < 100:
                     print('\b\b\b\b\b')
                 else:
-                    print('Done.')
-
+                    print(f'Done: {local}')
         file.flush()
 
 
@@ -152,12 +151,14 @@ def addIcons(shelfName, buttons):
                                  f'{localIconsPath}/{ico}')
                     if ii == 0:
                         shelfString += ',i1=\'' + ico + '\''
-        except Exception:
+        except Exception as e:
             print('file not available')
+            print('Exception:', e)
             # set icon to default button because image can not be downloaded
             shelfString += ',i1=\'commandButton.png\''
         # update progress
         cmds.progressBar('progressControl', edit=True, step=1)
+
         # download script from github
         if scriptsMenuI > 1:
             try:
@@ -167,6 +168,7 @@ def addIcons(shelfName, buttons):
                              f'{localScriptsPath}/{script}')
             except Exception:
                 print('file not available')
+
         # download modules from github
         if scriptsMenuI > 1:
             try:
