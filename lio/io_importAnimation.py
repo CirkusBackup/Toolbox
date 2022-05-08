@@ -9,7 +9,7 @@ def importAnimation(silent, selectedABC):
         try:
             # load abcExport plugin
             cmds.loadPlugin('AbcExport')
-        except:
+        except Exception:
             cmds.error('Could not load AbcExport plugin')
 
     myWorkspace = cmds.workspace(q=True, fullName=True)

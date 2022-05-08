@@ -18,7 +18,8 @@ def LlamaIOWindow():
         width=100,
         label='Publish REF',
         ann='Select top node to publish',
-        c='from lio.io_publishModel import IO_publishModel_window,PublishModelCheckText;lio.io_publishModel.IO_publishModel(0)'
+        c='from lio.io_publishModel import IO_publishModel_window,'
+          'PublishModelCheckText;lio.io_publishModel.IO_publishModel(0) '
     )
 
     cmds.popupMenu(parent='publishModel_btn')
@@ -36,11 +37,13 @@ def LlamaIOWindow():
     publishAnim_btn = cmds.iconTextButton(
         'publishAnim_btn', fla=0, st='iconAndTextVertical', i='io_publishAnim.svg',
         bgc=buttonColour, height=50, width=100, label='Publish Anim',
-        c='from lio.io_publishAnimation import IO_publishAnim_window, runWithUI;lio.io_publishAnimation.IO_publishAnim(0)',
+        c='from lio.io_publishAnimation import IO_publishAnim_window, '
+          'runWithUI;lio.io_publishAnimation.IO_publishAnim(0)',
         stp='python')
     cmds.popupMenu(parent='publishAnim_btn')
     cmds.menuItem(label='Advanced',
-                  c='from lio.io_publishAnimation import IO_publishAnim_window, runWithUI;lio.io_publishAnimation.IO_publishAnim(0)',
+                  c='from lio.io_publishAnimation import IO_publishAnim_window, '
+                    'runWithUI;lio.io_publishAnimation.IO_publishAnim(0)',
                   stp='python')
     publishCam_btn = cmds.iconTextButton(
         'publishCam_btn', fla=0, st='iconAndTextVertical', i='io_publishCam.svg',

@@ -184,6 +184,8 @@ def exportShaders(publishName, scenePath):
         except:
             pass
 
+        # TODO  this whole block of code should be re-written. The indentation
+        #       being done here is to much.
         if shadingGroups:
             allGeo += '-root %s ' % (shape)
             allMaterials += shadingGroups
