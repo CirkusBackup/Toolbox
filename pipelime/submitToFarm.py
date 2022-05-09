@@ -443,7 +443,15 @@ def submitButton():
 
 
 def setUiValue(uiObject, value, window):
+    """
+    Set the value of a ui element. If it is a string value then the {maya_ver} properly can be
+    used which will be replaced with the currently open maya version.
+    """
     type = uiObject.metaObject().className()
+
+    if isinstance(value['value'], str):
+        ver = cmds.about(v=True)
+        value['value'] = value['value'].replace('\{maya_ver\}', f'Maya{ver}')
 
     if type == 'QLineEdit':
         uiObject.setText(value["value"].strip('\''))
@@ -558,20 +566,20 @@ def submitRenderUI():
     stf_window.mainWidget.comboBox_jobType.currentTextChanged.connect(submitTypeChanged)
     # icon on button
     try:
-        buttonIcon = QtGui.QIcon("%s/icons/%s.png" % (qtBase.self_path(), "gear"))
+        buttonIcon = QtGui.QIcon(f"{qtBase.self_path()}/icons/{'gear'}.png")
         stf_window.mainWidget.pushButton_settings.setIcon(buttonIcon)
     except:
         pass
     # merge all dictionaries into one
     comboDict = {}
-    comboDict = mergeDictionaries(comboDict, IO.loadDictionary('%s/config/globalPrefs.json' % qtBase.self_path()))
-    comboDict = mergeDictionaries(comboDict, IO.loadDictionary('%s/data/projectPrefs.json' % getProj.getProject()))
-    comboDict = mergeDictionaries(comboDict, IO.loadDictionary('%s/localPrefs.json' % qtBase.local_path()))
-    rangeFromTimeline = '%s-%s' % (sceneVar.getStartFrame(), sceneVar.getEndFrame())
+    comboDict = mergeDictionaries(comboDict, IO.loadDictionary(f'{qtBase.self_path()}/config/globalPrefs.json'))
+    comboDict = mergeDictionaries(comboDict, IO.loadDictionary(f'{getProj.getProject()}/data/projectPrefs.json'))
+    comboDict = mergeDictionaries(comboDict, IO.loadDictionary(f'{qtBase.local_path()}/localPrefs.json'))
+    rangeFromTimeline = f'{sceneVar.getStartFrame()}-{sceneVar.getEndFrame()}'
     comboDict = mergeDictionaries(comboDict, {"lineEdit_range": {"value": rangeFromTimeline}})
     versionlessSceneName = ''.join([c for c in getProj.sceneName() if c not in "1234567890"])
     comboDict = mergeDictionaries(comboDict,
-                                  IO.loadDictionary('%s/.data/%s.json' % (getProj.sceneFolder(), versionlessSceneName)))
+                                  IO.loadDictionary(f'{getProj.sceneFolder()}/.data/{versionlessSceneName}.json'))
     # populate pool comboBox from /config/globalPrefs.json
     try:
         poolsList = ((comboDict["pools"]["value"])[2:-2]).replace('\'', '').split(',')
