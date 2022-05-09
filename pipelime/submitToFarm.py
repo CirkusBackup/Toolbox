@@ -451,7 +451,7 @@ def setUiValue(uiObject, value, window):
 
     if isinstance(value['value'], str):
         ver = cmds.about(v=True)
-        value['value'] = value['value'].replace('\{maya_ver\}', f'Maya{ver}')
+        value['value'] = value['value'].replace('{maya_ver}', f'Maya{ver}')
 
     if type == 'QLineEdit':
         uiObject.setText(value["value"].strip('\''))
