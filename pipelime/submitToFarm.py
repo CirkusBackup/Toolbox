@@ -12,22 +12,6 @@ import baseIO.qtBase as qtBase
 import baseIO.sceneVar as sceneVar
 
 
-def __setup_globals():
-    try:
-        del stf_window
-        del layers
-        del layerWidget
-    except:
-        pass
-
-    global stf_window
-    global layers
-    global layerWidget
-
-
-__setup_globals()
-
-
 class LayerWidget(qtBase.BaseWidget):
     layerWidgets = []
     previousValue = ''
@@ -134,6 +118,7 @@ def listCameras():
 
 
 def fetchPools():
+    global stf_window
     # use submit path to get poolManager
     submitPath = stf_window.mainWidget.lineEdit_submitExe.text()
     updatePools = submitPath.replace('submit.exe', 'PoolManager list NAME')
@@ -157,6 +142,7 @@ def openSceneFolder():
 
 
 def globalDict():
+    global stf_window
     prefData = []
     prefData.append(['pathToRenderExe', 'value', '\'%s\'' % stf_window.mainWidget.lineEdit_render.text()])
     prefData.append(['pathToSubmitExe', 'value', '\'%s\'' % stf_window.mainWidget.lineEdit_submitExe.text()])
@@ -164,6 +150,7 @@ def globalDict():
 
 
 def projectDict():
+    global stf_window
     prefData = []
     prefData.append(['pathToRenderExe', 'value', '\'%s\'' % stf_window.mainWidget.lineEdit_render.text()])
     prefData.append(['trelloBoard', 'value', '\'%s\'' % stf_window.mainWidget.lineEdit_trelloBoard.text()])
@@ -171,6 +158,7 @@ def projectDict():
 
 
 def localDict():
+    global stf_window
     prefData = []
     prefData.append(['userName', 'value', '\'%s\'' % stf_window.mainWidget.lineEdit_name.text()])
     prefData.append(['userSlackID', 'value', '\'%s\'' % stf_window.mainWidget.lineEdit_slack.text()])
@@ -183,6 +171,7 @@ def localDict():
 
 
 def fileDict():
+    global stf_window
     prefData = []
     prefData.append(['prioritySlider', 'value', stf_window.mainWidget.prioritySlider.value()])
     prefData.append(['comboBox_pool', 'value', '\'%s\'' % stf_window.mainWidget.comboBox_pool.currentText()])
@@ -195,6 +184,7 @@ def fileDict():
 
 
 def layerDict(l):
+    global stf_window
     # niceLayerName = l.checkBox_layerEnable.text().replace(':','_')
     niceLayerName = '%s.%s' % (l.renderLayerName, l.camName.replace(':', '_'))
     prefData = []
@@ -215,16 +205,19 @@ def layerDict(l):
 
 # button functions
 def selectSubmitExe():
+    global stf_window
     filename = QtWidgets.QFileDialog.getOpenFileName(filter='*.exe')
     stf_window.mainWidget.lineEdit_submitExe.setText(filename[0])
 
 
 def selectRenderExe():
+    global stf_window
     filename = QtWidgets.QFileDialog.getOpenFileName(filter='*.exe')
     stf_window.mainWidget.lineEdit_render.setText(filename[0])
 
 
 def bifrostCacheString(l):
+    global stf_window
     # yeti cache string
     renderLayerName = l.renderLayerName.replace(':', '_')
     filename = '%s/%s_%s' % (getProj.sceneName(), getProj.sceneName(), renderLayerName)
@@ -257,6 +250,7 @@ def bifrostCacheString(l):
 
 
 def yetiCacheString(l):
+    global stf_window
     # yeti cache string
     renderLayerName = l.renderLayerName.replace(':', '_')
     filename = '%s/%s_%s' % (getProj.sceneName(), getProj.sceneName(), renderLayerName)
@@ -289,6 +283,7 @@ def yetiCacheString(l):
 
 
 def playblastString(l):
+    global stf_window
     # playblast string
     filename = f'{getProj.sceneName()}/{getProj.sceneName()}_{l.renderLayerName}_{l.camName.rsplit("|", 1)[0].replace("|", "_")}'
 
@@ -317,6 +312,7 @@ def playblastString(l):
 
 
 def renderString(l):
+    global stf_window
     # render string
     submitString = ''
     submitString += f'\"{stf_window.mainWidget.lineEdit_submitExe.text()}\" Script '
@@ -352,6 +348,9 @@ def renderString(l):
 
 
 def submitButton():
+    global layerWidget
+    global stf_window
+    
     # progress bar
     countActiveLayers = 0
     for l in layerWidget.layerWidgets:
@@ -489,6 +488,9 @@ def mergeDictionaries(dict1, dict2):
 
 
 def clearLayers():
+    global layerWidget
+    if layerWidget is None:
+        return
     for l in layerWidget.layerWidgets:
         l.setParent(None)
     del layerWidget.layerWidgets[:]
@@ -582,6 +584,10 @@ def submitRenderUI():
 
 
 def openSubmitWindow():
+    global stf_window
+    global layers
+    global layerWidget
+    
     stf_window = submitRenderUI()
     # get render layers from scene
     layers = sceneVar.getRenderLayers()
