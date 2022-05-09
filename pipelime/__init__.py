@@ -1,2 +1,2 @@
-import lm_projectWindow
-import submitToFarm
+from . import lm_projectWindow
+from . import submitToFarm
