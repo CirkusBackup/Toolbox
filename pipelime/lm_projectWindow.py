@@ -14,29 +14,29 @@ def makeFolders(folderNames):
 def createButton():
     folderNames = []
 
-    varients = []
+    variants = []
 
     for v in bwidget.layerWidgets:
         try:
             if not v.isHidden():
-                varients.append(v.variant_lineEdit.text())
+                variants.append(v.variant_lineEdit.text())
         except:
             pass
-    if not varients:
-        varients = ['']
+    if not variants:
+        variants = ['']
 
     parentFolder = lm_projectWin.mainWidget.comboBox_root.currentText()
     clientName = lm_projectWin.mainWidget.lineEdit_client.text()
     projectName = lm_projectWin.mainWidget.lineEdit_project.text()
 
-    projectRoot = '%s/untitledProject' % (parentFolder)
+    projectRoot = f'{parentFolder}/untitledProject'
 
     if clientName and projectName:
-        projectRoot = '%s/%s_%s' % (parentFolder, clientName, projectName)
+        projectRoot = f'{parentFolder}/{clientName}_{projectName}'
     elif clientName:
-        projectRoot = '%s/%s' % (parentFolder, clientName)
+        projectRoot = f'{parentFolder}/{clientName}'
     elif projectName:
-        projectRoot = '%s/%s' % (parentFolder, projectName)
+        projectRoot = f'{parentFolder}/{projectName}'
 
     folderStructureDict = loadSave.loadDictionary(f'{qtBase.self_path()}/pipelime/lm_folderStructure.json')
 
@@ -61,7 +61,7 @@ def createButton():
                 if '<var>' not in i:
                     folderNames.append(f'{projectRoot}/{i}')
                 else:
-                    for v in varients:
+                    for v in variants:
                         vi = i.replace('<var>', v)
                         folderNames.append(f'{projectRoot}/{vi}')
 
@@ -83,7 +83,7 @@ def createButton():
                 pass
 
     # set prefs for project
-    projectDict('%s/.projectData' % projectRoot)
+    projectDict(f'{projectRoot}/.projectData')
 
     # open window
     path = os.path.realpath(projectRoot)
@@ -114,16 +114,16 @@ class VariantWidget(qtBase.BaseWidget):
 
 
 def resolutionChange(text):
-    folderStructureDict = loadSave.loadDictionary('%s/pipelime/lm_folderStructure.json' % qtBase.self_path())
+    folderStructureDict = loadSave.loadDictionary(f'{qtBase.self_path()}/pipelime/lm_folderStructure.json')
     lm_projectWin.mainWidget.lineEdit_resW.setText(folderStructureDict["settings"]["resolution"][text][0])
     lm_projectWin.mainWidget.lineEdit_resH.setText(folderStructureDict["settings"]["resolution"][text][1])
 
 
 def projectDict(folder):
     prefData = []
-    prefData.append(['frameRate', 'value', '%s' % lm_projectWin.mainWidget.comboBox_frameRate.currentText()])
-    prefData.append(['resolutionW', 'value', '%s' % lm_projectWin.mainWidget.lineEdit_resW.text()])
-    prefData.append(['resolutionH', 'value', '%s' % lm_projectWin.mainWidget.lineEdit_resH.text()])
+    prefData.append(['frameRate', 'value', f'{lm_projectWin.mainWidget.comboBox_frameRate.currentText()}'])
+    prefData.append(['resolutionW', 'value', f'{lm_projectWin.mainWidget.lineEdit_resW.text()}'])
+    prefData.append(['resolutionH', 'value', f'{lm_projectWin.mainWidget.lineEdit_resH.text()}'])
     loadSave.writePrefsToFile(prefData, '%s/projectPrefs.json' % folder)
 
 
@@ -158,9 +158,3 @@ def openProjectWindow():
     global bwidget
     lm_projectWin = lm_projectWindow()
     bwidget = VariantWidget(lm_projectWin)
-
-# import pipelime.lm_projectWindow as lm_projectWindow
-# lm_projectWindow.openProjectWindow()
-
-
-# openProjectWindow()

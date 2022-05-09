@@ -12,6 +12,22 @@ import baseIO.qtBase as qtBase
 import baseIO.sceneVar as sceneVar
 
 
+def __setup_globals():
+    try:
+        del stf_window
+        del layers
+        del layerWidget
+    except:
+        pass
+
+    global stf_window
+    global layers
+    global layerWidget
+
+
+__setup_globals()
+
+
 class LayerWidget(qtBase.BaseWidget):
     layerWidgets = []
     previousValue = ''
@@ -214,20 +230,20 @@ def bifrostCacheString(l):
     filename = '%s/%s_%s' % (getProj.sceneName(), getProj.sceneName(), renderLayerName)
 
     pbString = ''
-    pbString += '%s Script ' % stf_window.mainWidget.lineEdit_submitExe.text()
+    pbString += f'{stf_window.mainWidget.lineEdit_submitExe.text()} Script '
     pbString += ' -Type Generic Script'
-    pbString += ' -Name maya: %s (%s)' % (getProj.sceneName(), l.checkBox_layerEnable.text())
+    pbString += f' -Name maya: {getProj.sceneName()} ({l.checkBox_layerEnable.text()})'
     pbString += ' -UsageLimit 1'
     pbString += ' -DistributeMode \"Forward\"'
-    pbString += ' -Priority %s' % l.layerPrioritySlider.value()
-    pbString += ' -PacketSize %s' % l.spinBox_layerPacketSize.value()
-    pbString += ' -Pool %s' % l.comboBox_layerPool.currentText()
-    pbString += ' -Range %s' % l.lineEdit_layerRange.text()
-    pbString += ' -Executable %s' % stf_window.mainWidget.lineEdit_render.text()
+    pbString += f' -Priority {l.layerPrioritySlider.value()}'
+    pbString += f' -PacketSize {l.spinBox_layerPacketSize.value()}'
+    pbString += f' -Pool {l.comboBox_layerPool.currentText()}'
+    pbString += f' -Range {l.lineEdit_layerRange.text()}'
+    pbString += f' -Executable {stf_window.mainWidget.lineEdit_render.text()}'
     pbString += ' -Paused'
-    pbString += ' -Creator %s' % stf_window.mainWidget.lineEdit_name.text()
-    pbString += ' -StaggerStart %s' % stf_window.mainWidget.lineEdit_stagger.text()
-    pbString += ' -Note %s' % stf_window.mainWidget.lineEdit_note.text()
+    pbString += f' -Creator {stf_window.mainWidget.lineEdit_name.text()}'
+    pbString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
+    pbString += f' -Note {stf_window.mainWidget.lineEdit_note.text()}'
     mayaBatchPath = stf_window.mainWidget.lineEdit_render.text().replace('Render', 'mayaBatch')
     # imgDir = cmds.workspace(fileRuleEntry="images")
     cacheFile = '%scache/yeti/%s.%%04d.fur' % (getProj.getProject(), filename)
@@ -246,23 +262,23 @@ def yetiCacheString(l):
     filename = '%s/%s_%s' % (getProj.sceneName(), getProj.sceneName(), renderLayerName)
 
     pbString = ''
-    pbString += '%s Script ' % stf_window.mainWidget.lineEdit_submitExe.text()
+    pbString += f'{stf_window.mainWidget.lineEdit_submitExe.text()} Script '
     pbString += ' -Type Generic Script'
-    pbString += ' -Name maya: %s (%s)' % (getProj.sceneName(), l.checkBox_layerEnable.text())
+    pbString += f' -Name maya: {getProj.sceneName()} ({l.checkBox_layerEnable.text()})'
     pbString += ' -UsageLimit 1'
     pbString += ' -DistributeMode \"Forward\"'
-    pbString += ' -Priority %s' % l.layerPrioritySlider.value()
-    pbString += ' -PacketSize %s' % l.spinBox_layerPacketSize.value()
-    pbString += ' -Pool %s' % l.comboBox_layerPool.currentText()
-    pbString += ' -Range %s' % l.lineEdit_layerRange.text()
-    pbString += ' -Executable %s' % stf_window.mainWidget.lineEdit_render.text()
+    pbString += f' -Priority {l.layerPrioritySlider.value()}'
+    pbString += f' -PacketSize {l.spinBox_layerPacketSize.value()}'
+    pbString += f' -Pool {l.comboBox_layerPool.currentText()}'
+    pbString += f' -Range {l.lineEdit_layerRange.text()}'
+    pbString += f' -Executable {stf_window.mainWidget.lineEdit_render.text()}'
     pbString += ' -Paused'
-    pbString += ' -Creator %s' % stf_window.mainWidget.lineEdit_name.text()
-    pbString += ' -StaggerStart %s' % stf_window.mainWidget.lineEdit_stagger.text()
-    pbString += ' -Note %s' % stf_window.mainWidget.lineEdit_note.text()
+    pbString += f' -Creator {stf_window.mainWidget.lineEdit_name.text()}'
+    pbString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
+    pbString += f' -Note {stf_window.mainWidget.lineEdit_note.text()}'
     mayaBatchPath = stf_window.mainWidget.lineEdit_render.text().replace('Render', 'mayaBatch')
     # imgDir = cmds.workspace(fileRuleEntry="images")
-    cacheFile = '%scache/yeti/%s.%%04d.fur' % (getProj.getProject(), filename)
+    cacheFile = f'{getProj.getProject()}cache/yeti/{filename}.%04d.fur'
     cacheFolder = cacheFile.rsplit('/', 1)[0]
     if not os.path.exists(cacheFolder):
         os.makedirs(cacheFolder)
@@ -274,25 +290,24 @@ def yetiCacheString(l):
 
 def playblastString(l):
     # playblast string
-    filename = '%s/%s_%s_%s' % (
-        getProj.sceneName(), getProj.sceneName(), l.renderLayerName, l.camName.rsplit('|', 1)[0].replace('|', '_'))
+    filename = f'{getProj.sceneName()}/{getProj.sceneName()}_{l.renderLayerName}_{l.camName.rsplit("|", 1)[0].replace("|", "_")}'
 
     pbString = ''
-    pbString += '%s Script ' % stf_window.mainWidget.lineEdit_submitExe.text()
+    pbString += f'{stf_window.mainWidget.lineEdit_submitExe.text()} Script '
     pbString += ' -Type Generic Script'
-    pbString += ' -Name maya: %s (%s)' % (getProj.sceneName(), l.checkBox_layerEnable.text())
-    pbString += ' -Priority %s' % l.layerPrioritySlider.value()
-    pbString += ' -PacketSize %s' % l.spinBox_layerPacketSize.value()
-    pbString += ' -Pool %s' % l.comboBox_layerPool.currentText()
-    pbString += ' -Range %s' % l.lineEdit_layerRange.text()
-    pbString += ' -Executable %s' % stf_window.mainWidget.lineEdit_render.text()
+    pbString += f' -Name maya: {getProj.sceneName()} ({l.checkBox_layerEnable.text()})'
+    pbString += f' -Priority {l.layerPrioritySlider.value()}'
+    pbString += f' -PacketSize {l.spinBox_layerPacketSize.value()}'
+    pbString += f' -Pool {l.comboBox_layerPool.currentText()}'
+    pbString += f' -Range {l.lineEdit_layerRange.text()}'
+    pbString += f' -Executable {stf_window.mainWidget.lineEdit_render.text()}'
     pbString += ' -Paused'
-    pbString += ' -Creator %s' % stf_window.mainWidget.lineEdit_name.text()
-    pbString += ' -StaggerStart %s' % stf_window.mainWidget.lineEdit_stagger.text()
-    pbString += ' -Note %s' % stf_window.mainWidget.lineEdit_note.text()
+    pbString += f' -Creator {stf_window.mainWidget.lineEdit_name.text()}'
+    pbString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
+    pbString += f' -Note {stf_window.mainWidget.lineEdit_note.text()}'
     mayaBatchPath = stf_window.mainWidget.lineEdit_render.text().replace('Render', 'mayaBatch')
     # imgDir = cmds.workspace(fileRuleEntry="images")
-    playblastFolder = '%simages/playblasts/%s' % (getProj.getProject(), filename)
+    playblastFolder = f'{getProj.getProject()}images/playblasts/{filename}'
     pbString += f' -Command "{mayaBatchPath} -file \\\"{getProj.filepath()}\\\" -command \\\"setPlayblastOptions(' \
                 f'\\\"\\\"{l.camName}\\\"\\\",\\\"\\\"{l.renderLayerName}\\\"\\\");playblast -format image -startTime ' \
                 f'$(SubRange.Start) -endTime $(SubRange.End) -filename (\\\"\\\"{playblastFolder}\\\"\\\") ' \
@@ -567,17 +582,6 @@ def submitRenderUI():
 
 
 def openSubmitWindow():
-    try:
-        del stf_window
-        del layers
-        del layerWidget
-    except:
-        pass
-
-    global stf_window
-    global layers
-    global layerWidget
-
     stf_window = submitRenderUI()
     # get render layers from scene
     layers = sceneVar.getRenderLayers()
@@ -589,7 +593,3 @@ def openSubmitWindow():
     currentText = stf_window.mainWidget.comboBox_jobType.currentText()
     submitTypeChanged(currentText)
 
-# import pipelime.submitToFarm as submitToFarm
-# submitToFarm.openSubmitWindow()
-
-# openSubmitWindow()
