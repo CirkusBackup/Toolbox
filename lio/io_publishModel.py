@@ -5,7 +5,7 @@ from shutil import copyfile
 import maya.cmds as cmds
 import maya.mel as mel
 
-from LlamaIO import addAttribute
+from lio.LlamaIO import addAttribute
 from textwrap import dedent
 
 """

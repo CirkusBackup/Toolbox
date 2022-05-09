@@ -73,6 +73,7 @@ def downloadFile(remote: str, local: str):
         block_size = 8192
         cur_block = 0
 
+        print ('')
         print(f'Starting download of file {remote} ({total_size} bytes)...')
 
         # Start downloading chunks
@@ -85,12 +86,11 @@ def downloadFile(remote: str, local: str):
                 percent = int(cur_block * block_size * 100 / total_size)
                 if percent > 100:
                     percent = 100
-                print(f'    {percent:.2f}%')
-                if percent < 100:
-                    print('\b\b\b\b\b')
-                else:
+                if percent >= 100:
                     print(f'Done: {local}')
-        file.flush()
+                else:
+                    print(f'    {percent:.2f}%')
+
 
 
 def checkGroups(shelfName):

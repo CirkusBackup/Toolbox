@@ -1,6 +1,6 @@
 import maya.cmds as cmds
 import os
-from LlamaIO import addAttribute
+from lio.LlamaIO import addAttribute
 
 """
     EXPORTS

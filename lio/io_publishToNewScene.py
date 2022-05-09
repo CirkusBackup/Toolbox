@@ -4,8 +4,8 @@ import subprocess
 import maya.cmds as cmds
 
 import lio
-from LlamaIO import UserPrefs
-from LlamaIO import containsDigits
+from .LlamaIO import UserPrefs
+from .LlamaIO import containsDigits
 
 
 def runExportScripts():
