@@ -1,82 +1,116 @@
-// -- Select Vector Path -- //
+// Preform the referenceing of the window.
+global proc multiref_selectFiles() {
+	string $ws = `workspace -q -dir`;
+	string $scenes = $ws + "/scenes";
+	int $useImport = `radioButtonGrp -q -select "multiref_importType"`;
+	string $filter = "Maya Files (*.ma *.mb)";
 
-global proc select_path(){
-	string $mayaFolder;
-	$mayaFolder = `workspace -fullName`;
-	$imagesFolder = ($mayaFolder +"/scenes");
-	workspace -dir $imagesFolder;
-	fileBrowserDialog -mode 0
-		-fileCommand ( "browseForFolderCallback_v \"" + $mayaFolder + "\"" )
-		-actionName "Select";
-}
-
-global proc browseForFolderCallback_v( string $mayaFolder, string $result, string $type){
-	textFieldButtonGrp -e -text $result pathInput;
-	
-	string $sections[];
-	$numTokens = `tokenize $result "." $sections`;
-
-	string $subSections[];
-	$subTokens = `tokenize $sections[0] "/" $subSections`;
-
-	int $subInt = $subTokens -1;
-	
-	textField -e -text $subSections[$subInt] namespaceInput;
-	
-	workspace -dir $mayaFolder;
-	
-}
-
-global proc doReference(){
-	int $numberOfRefs = `textField -q -text copiesInt `;
-	string $referenceFiles = `textFieldButtonGrp -q -text pathInput`;
-	string $namespace = `textField -q -text namespaceInput`;
-	if (`radioButtonGrp -q -select myRadBtnGrp` == 1) {
-		for ($i=0;$i < $numberOfRefs;$i++){
-			file -r -type "mayaBinary" -gl -loadReferenceDepth "all" -namespace $namespace $referenceFiles;
-		}
-	}else{
-		for ($i=0;$i < $numberOfRefs;$i++){
-			file -import -type "mayaBinary" -ra true -namespace $namespace -pr $referenceFiles;
-		}
+	// Allow for more file types if we are importing instead of refernecing.
+	if ($useImport) {
+		$filter = "Maya Files (*.ma *.mb); All Files (.*)";
 	}
 
+	string $selected[] = `fileDialog2 -mode 4 -okCaption "Select" -dir $scenes -ff $filter`;
+	string $namesapce = `textField -q -text "multiref_namespaceInput"`;
+
+	// Don't continue if nothing was selected.
+	if (size($selected) == 0) {
+		return;
+	}
+
+	// Actually import / ref the files into the scene.
+	if ($useImport) {
+		print("Importing " + size($selected) + " files into this scene...")
+		for ($file in $selected) {
+			$fileType = tokenize();
+			$num = `tokenize $file`;
+			print($file);
+			// file -r -loadReferenceDepth "all" -namespace "" -mnc;
+		}
+	} else {
+		print("Referencing " + size($selected) + " files into this scene...")
+		for ($file in $selected) {
+			print($file);
+			// file -i -gl -
+		}
+	}
 }
 
-// -- Create GUI -- //
 
-global proc multiRef(){
+// Opens a window that allows you to import ot reference multiple files
+// at the same time.
+global proc multiRef() {
+	if (`window -ex "multiref_window"`) {
+		deleteUI "multiref_window";
+	}
 
+	// Create the window elements
+	window -w 180 -rtf true -s false -title "Multi Importer" "multiref_window";
 
-	if (`window -ex blur2D_setupWindow` == 1){
-		deleteUI blur2D_setupWindow;
-	} 
-	window -w 180 -rtf true -title "multi importer" blur2D_setupWindow;
+	columnLayout;
+	text -label "Select multiple files to be imported at once. Set if the files 
+	will be imported or refernced before selecting the in this window." -ww true;
 
 	rowColumnLayout -numberOfColumns 2 -columnAttach 1 "right" 0
-    -columnWidth 1 100 -columnWidth 2 300;
-
+    	-columnWidth 1 100 -columnWidth 2 300;
 	
-	text -label "copies    ";
-	textField -w 50 copiesInt;
-
-
-	text -label "file path    ";
-	textFieldButtonGrp -bc "select_path" -buttonLabel "cl i c k" pathInput;
+	text -label "Namespace		";
+	textField -w 50 "multiref_namespaceInput";
 	
-	text -label "namespace    ";
-	textField -w 50 namespaceInput;
-	
-	text -label "type   ";
-	radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 myRadBtnGrp;
+	text -label "Operation		";
+	radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 "multiref_importType";
 
 	text -label "";
 	rowLayout -numberOfColumns 3 -columnWidth3 80 80 80;
-	button -w 80 -c doReference -label "Apply";
-	
-	showWindow blur2D_setupWindow;
-	
-
+	button -w 80 -c "multiref_selectFiles" -label "Select Files";
 }
 
+// global proc doReference() {
+// 	int $numberOfRefs = `intField -q -value copiesInt `;
+// 	string $referenceFiles = `textFieldButtonGrp -q -text pathInput`;
+// 	string $namespace = `textField -q -text namespaceInput`;
 
+// 	if (`radioButtonGrp -q -select myRadBtnGrp` == 1) {
+// 		for ($i=0;$i < $numberOfRefs;$i++){
+// 			file -r -type "mayaBinary" -gl -loadReferenceDepth "all" -namespace $namespace $referenceFiles;
+// 		}
+// 	}else{
+// 		for ($i=0;$i < $numberOfRefs;$i++){
+// 			file -import -type "mayaBinary" -ra true -namespace $namespace -pr $referenceFiles;
+// 		}
+// 	}
+// }
+
+// global proc multiRef() {
+// 	if (`window -ex blur2D_setupWindow` == 1){
+// 		deleteUI blur2D_setupWindow;
+// 	} 
+// 	window -w 180 -rtf true -s false -title "multi importer" blur2D_setupWindow;
+
+// 	rowColumnLayout -numberOfColumns 1 -columnAttach 1 "right" 0
+//     	-columnWidth 1 100 -columnWidth 2 300;
+
+// 	text -label "" -ww true multiref_info;
+// 	text -label "0 files selected" -ww true multiref_selected;
+
+// 	rowColumnLayout -numberOfColumns 2 -columnAttach 1 "right" 0
+//     	-columnWidth 1 100 -columnWidth 2 300;
+
+// 	text -label "copies    ";
+// 	intField -w 50 copiesInt -min 1;
+
+// 	text -label "file path    ";
+// 	textFieldButtonGrp -bc "select_path" -buttonLabel "Select File" pathInput;
+	
+// 	text -label "namespace    ";
+// 	textField -w 50 namespaceInput;
+	
+// 	text -label "type   ";
+// 	radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 myRadBtnGrp;
+
+// 	text -label "";
+// 	rowLayout -numberOfColumns 3 -columnWidth3 80 80 80;
+// 	button -w 80 -c doReference -label "Apply";
+	
+// 	showWindow blur2D_setupWindow;
+// }
