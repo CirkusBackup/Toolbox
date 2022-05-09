@@ -11,6 +11,7 @@ global proc _multiref_selectFiles() {
 	int $useImport = `radioButtonGrp -q -select "multiref_importType"` == 2;
 	string $filter = "Maya Files (*.ma *.mb)";
 	string $namespace = `textField -q -text "multiref_namespaceInput"`;
+	string $count = `intField -q -value "multiref_importcount"`;
 
 	// Allow for more file types if we are importing instead of refernecing.
 	if ($useImport) {
@@ -41,27 +42,31 @@ global proc _multiref_selectFiles() {
 		print ("\n" + "Changed namespace to " + $namespace);
 	}
 
-	// Actually import / ref the files into the scene.
-	if ($useImport) {
-		print("\nImporting " + size($selected) + " files into this scene...");
-		for ($file in $selected) {
-			string $fileTypeData[];
-			int $num = `tokenize $file "//" $fileTypeData`;
-			$name = $fileTypeData[size($fileTypeData) - 1];
-			print("\n" + $name);
+	// Import the files
+	for ($file in $selected) {
+		_multiref_import_file($file, $count, $namespace, $useImport);
+	}
+	print("\n Done.");
+}
+
+
+// Imports a file x amount of times.
+global proc _multiref_import_file(string $file, int $count, string $namespace, string $useImport) {
+	string $fileTypeData[];
+	int $num = `tokenize $file "//" $fileTypeData`;
+	$name = $fileTypeData[$num - 1];
+
+	for ($i = 0; $i < $count; $i++) {
+		if ($useImport) {
+			// Import the file.
+			print("\n Importing " + $name);
 			file -i -ra true -namespace $namespace -pr -mnc 1 $file;
-		}
-	} else {
-		print("\nReferencing " + size($selected) + " files into this scene...");
-		for ($file in $selected) {
-			string $fileTypeData[];
-			int $num = `tokenize $file "//" $fileTypeData`;
-			$name = $fileTypeData[size($fileTypeData) - 1];
+		} else {
+			// Reference the file.
 			print("\n Referencing " + $name);
 			file -r -loadReferenceDepth "all" -namespace $namespace -mnc 1 $file;
 		}
 	}
-	print("\n Done.");
 }
 
 
@@ -81,16 +86,22 @@ global proc multiRef() {
 	// Create the window elements
 	$win = `window -w 150 -h 200 -s false -title "Multi Importer" "multiref_window"`;
 
+    string $abouttxt = "Select multiple files to be imported at once. Set if the files";
+    $abouttxt += "will be imported or refernced before selecting the in this window.";
+    $abouttxt += "Instance count lets you set how myn instances of each file will be imported / refernced.";
+
 	columnLayout -adj 1 -co "both" 20;
-		text -w 100 -label "Select multiple files to be imported at once. Set if the files \
-		will be imported or refernced before selecting the in this window." -ww true -align "center";
+		text -w 100 -h 100 -label $abouttxt -ww true -align "left";
 		setParent ..;
 
 	rowColumnLayout -numberOfColumns 2 -columnAttach 1 "right" 0
-    	-columnWidth 1 100 -columnWidth 2 300 -ro 1 "top" 5 -co 1 "left" 0;
+    	-columnWidth 1 100 -columnWidth 2 200 -ro 1 "top" 0 -co 1 "left" 0;
 	
 		text -label "Namespace		";
-		textField -w 50 "multiref_namespaceInput";
+		textField -w 50 -ann "The namespace that will be used when importing." "multiref_namespaceInput";
+
+		text -l "Instance Count		";
+		intField -min 1 -v 1 -ann "How many of each file will be imported/refernced." "multiref_importcount";
 		
 		text -label "Operation		";
 		radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 "multiref_importType";
