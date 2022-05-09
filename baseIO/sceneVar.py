@@ -1,30 +1,33 @@
 import maya.cmds as cmds
 
+
 def getRenderLayers():
-	#returns render layers and their states
-	renderlayers = cmds.ls(type="renderLayer")
-	'''
-	filter out extra legacy and default render layers
-	'''
-	layerData = []
-	for layer in renderlayers:
+    """
+    Returns render layers and their states.
+    """
+    layers = cmds.ls(type="renderLayer")
+    layerData = []
 
-		if ':defaultRenderLayer' in layer:
-			print 'skipping %s'%layer
-		elif '_defaultRenderLayer' in layer:
-			print 'skipping %s'%layer
-		else:
-		    renderable = cmds.getAttr('%s.renderable'%layer)
-		    layerData.append([layer,renderable])
+    # Filter out extra legacy and default render layers.
+    for layer in layers:
+        if ':defaultRenderLayer' in layer:
+            print(f'skipping {layer}')
+        elif '_defaultRenderLayer' in layer:
+            print(f'skipping {layer}')
+        else:
+            renderable = cmds.getAttr(f'{layer}.renderable')
+            layerData.append([layer, renderable])
 
-	return layerData
+    return layerData
+
 
 def getStartFrame():
-	startFrame = cmds.playbackOptions(q=True,min=True )
-	startFrameStr = str('{0:g}'.format(startFrame))
-	return str(startFrameStr)
+    startFrame = cmds.playbackOptions(q=True, min=True)
+    startFrameStr = str('{0:g}'.format(startFrame))
+    return str(startFrameStr)
+
 
 def getEndFrame():
-	endFrame = cmds.playbackOptions(q=True,max=True )
-	endFrameStr = str('{0:g}'.format(endFrame))
-	return str(endFrameStr)
+    endFrame = cmds.playbackOptions(q=True, max=True)
+    endFrameStr = str('{0:g}'.format(endFrame))
+    return str(endFrameStr)

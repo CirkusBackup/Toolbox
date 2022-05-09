@@ -1,8 +1,7 @@
-import loadSave
-import getProj
-import sceneVar
-import qtBase
-import metaData
-import incrementalSave
-import IOuserPref
-import stringFormat
+from . import loadSave
+from . import getProj
+from . import sceneVar
+from . import qtBase
+from . import incrementalSave
+from . import IOuserPref
+from . import stringFormat
