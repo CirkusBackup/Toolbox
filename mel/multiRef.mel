@@ -1,38 +1,74 @@
 // Preform the referenceing of the window.
-global proc multiref_selectFiles() {
+// This will open up a file dialog to select multiple files from.
+// All files selected in the dialog will then be imported or refenced
+// into the scene depending what was selected in the prior window.
+//
+// If a namespace is left empty in the importer then a new namespace will
+// be created from the first selected file in the dialog.
+global proc _multiref_selectFiles() {
 	string $ws = `workspace -q -dir`;
 	string $scenes = $ws + "/scenes";
-	int $useImport = `radioButtonGrp -q -select "multiref_importType"`;
+	int $useImport = `radioButtonGrp -q -select "multiref_importType"` == 2;
 	string $filter = "Maya Files (*.ma *.mb)";
+	string $namespace = `textField -q -text "multiref_namespaceInput"`;
 
 	// Allow for more file types if we are importing instead of refernecing.
 	if ($useImport) {
-		$filter = "Maya Files (*.ma *.mb); All Files (.*)";
+		$filter = "Maya Files (*.ma *.mb);; All Files (*.*)";
 	}
 
-	string $selected[] = `fileDialog2 -mode 4 -okCaption "Select" -dir $scenes -ff $filter`;
-	string $namesapce = `textField -q -text "multiref_namespaceInput"`;
+	// Close the old UI.
+	_multiref_cancel();
+
+	string $selected[] = `fileDialog2 
+		-fileMode 4 
+		-okCaption "Select" 
+		-caption ("Select what files to " + ($useImport ? "Import" : "Reference")) 
+		-dir $scenes -ff $filter`;
 
 	// Don't continue if nothing was selected.
 	if (size($selected) == 0) {
 		return;
 	}
+	
+	// Create a new namespace if this one is in set to nothing.
+	if (size($namespace) == 0) {
+		string $buff[];
+		$len = `tokenize $selected[0] "//" $buff`;
+		string $fn[];
+		tokenize $buff[$len - 1] "." $fn;
+		$namespace = $fn[0] + "REF";
+		print ("\n" + "Changed namespace to " + $namespace);
+	}
 
 	// Actually import / ref the files into the scene.
 	if ($useImport) {
-		print("Importing " + size($selected) + " files into this scene...")
+		print("\nImporting " + size($selected) + " files into this scene...");
 		for ($file in $selected) {
-			$fileType = tokenize();
-			$num = `tokenize $file`;
-			print($file);
-			// file -r -loadReferenceDepth "all" -namespace "" -mnc;
+			string $fileTypeData[];
+			int $num = `tokenize $file "//" $fileTypeData`;
+			$name = $fileTypeData[size($fileTypeData) - 1];
+			print("\n" + $name);
+			file -i -ra true -namespace $namespace -pr -mnc 1 $file;
 		}
 	} else {
-		print("Referencing " + size($selected) + " files into this scene...")
+		print("\nReferencing " + size($selected) + " files into this scene...");
 		for ($file in $selected) {
-			print($file);
-			// file -i -gl -
+			string $fileTypeData[];
+			int $num = `tokenize $file "//" $fileTypeData`;
+			$name = $fileTypeData[size($fileTypeData) - 1];
+			print("\n Referencing " + $name);
+			file -r -loadReferenceDepth "all" -namespace $namespace -mnc 1 $file;
 		}
+	}
+	print("\n Done.");
+}
+
+
+// Closes the window for the multiref importer.
+global proc _multiref_cancel() {
+	if (`window -ex "multiref_window"`) {
+		deleteUI "multiref_window";
 	}
 }
 
@@ -40,77 +76,34 @@ global proc multiref_selectFiles() {
 // Opens a window that allows you to import ot reference multiple files
 // at the same time.
 global proc multiRef() {
-	if (`window -ex "multiref_window"`) {
-		deleteUI "multiref_window";
-	}
+	_multiref_cancel();
 
 	// Create the window elements
-	window -w 180 -rtf true -s false -title "Multi Importer" "multiref_window";
+	$win = `window -w 150 -h 200 -s false -title "Multi Importer" "multiref_window"`;
 
-	columnLayout;
-	text -label "Select multiple files to be imported at once. Set if the files 
-	will be imported or refernced before selecting the in this window." -ww true;
+	columnLayout -adj 1 -co "both" 20;
+		text -w 100 -label "Select multiple files to be imported at once. Set if the files \
+		will be imported or refernced before selecting the in this window." -ww true -align "center";
+		setParent ..;
 
 	rowColumnLayout -numberOfColumns 2 -columnAttach 1 "right" 0
-    	-columnWidth 1 100 -columnWidth 2 300;
+    	-columnWidth 1 100 -columnWidth 2 300 -ro 1 "top" 5 -co 1 "left" 0;
 	
-	text -label "Namespace		";
-	textField -w 50 "multiref_namespaceInput";
-	
-	text -label "Operation		";
-	radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 "multiref_importType";
+		text -label "Namespace		";
+		textField -w 50 "multiref_namespaceInput";
+		
+		text -label "Operation		";
+		radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 "multiref_importType";
+		setParent ..;
 
-	text -label "";
-	rowLayout -numberOfColumns 3 -columnWidth3 80 80 80;
-	button -w 80 -c "multiref_selectFiles" -label "Select Files";
+	text -l "" -h 20;
+
+	// Select and Cancel Button
+	rowLayout -nc 2;
+		button -w 150 -c "_multiref_cancel" -label "Cancel";
+		button -w 150 -c "_multiref_selectFiles" -label "Select Files";
+		setParent ..;
+
+	showWindow $win;
+	window -e -wh 350 220 $win;
 }
-
-// global proc doReference() {
-// 	int $numberOfRefs = `intField -q -value copiesInt `;
-// 	string $referenceFiles = `textFieldButtonGrp -q -text pathInput`;
-// 	string $namespace = `textField -q -text namespaceInput`;
-
-// 	if (`radioButtonGrp -q -select myRadBtnGrp` == 1) {
-// 		for ($i=0;$i < $numberOfRefs;$i++){
-// 			file -r -type "mayaBinary" -gl -loadReferenceDepth "all" -namespace $namespace $referenceFiles;
-// 		}
-// 	}else{
-// 		for ($i=0;$i < $numberOfRefs;$i++){
-// 			file -import -type "mayaBinary" -ra true -namespace $namespace -pr $referenceFiles;
-// 		}
-// 	}
-// }
-
-// global proc multiRef() {
-// 	if (`window -ex blur2D_setupWindow` == 1){
-// 		deleteUI blur2D_setupWindow;
-// 	} 
-// 	window -w 180 -rtf true -s false -title "multi importer" blur2D_setupWindow;
-
-// 	rowColumnLayout -numberOfColumns 1 -columnAttach 1 "right" 0
-//     	-columnWidth 1 100 -columnWidth 2 300;
-
-// 	text -label "" -ww true multiref_info;
-// 	text -label "0 files selected" -ww true multiref_selected;
-
-// 	rowColumnLayout -numberOfColumns 2 -columnAttach 1 "right" 0
-//     	-columnWidth 1 100 -columnWidth 2 300;
-
-// 	text -label "copies    ";
-// 	intField -w 50 copiesInt -min 1;
-
-// 	text -label "file path    ";
-// 	textFieldButtonGrp -bc "select_path" -buttonLabel "Select File" pathInput;
-	
-// 	text -label "namespace    ";
-// 	textField -w 50 namespaceInput;
-	
-// 	text -label "type   ";
-// 	radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 myRadBtnGrp;
-
-// 	text -label "";
-// 	rowLayout -numberOfColumns 3 -columnWidth3 80 80 80;
-// 	button -w 80 -c doReference -label "Apply";
-	
-// 	showWindow blur2D_setupWindow;
-// }
