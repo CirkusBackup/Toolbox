@@ -206,20 +206,11 @@
 				"stp":"mel"
 			},
 			{	
-				"icon":"checkOutYeti.svg",
+				"icon": ["checkOutYeti.svg", "releaseYeti.svg"],
 				"label":"Check Out Yeti Licence",
-				"command":"putenv \"YETI_INTERACTIVE_LICENSE\" \"1\";",
-				"stp":"mel",
-				"menuItem":[
-					{
-						"label":"Check Out Licence",
-						"command":"putenv \"YETI_INTERACTIVE_LICENSE\" \"1\";"
-					},
-					{
-						"label":"Release Licence",
-						"command":"pgYetiCommand -returnLicense;putenv \"YETI_INTERACTIVE_LICENSE\" \"0\";"
-					}
-				]
+				"script": "mel/yetiLicenceActivation.mel",
+				"command":"source yetiLicenceActivation;yetiLicenceActivation",
+				"stp":"mel"
 			},
 			{
 				"icon":"cacheBifrost.svg",

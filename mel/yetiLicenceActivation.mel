@@ -1,0 +1,168 @@
+// 
+// Yeti Licence Activation Manager.
+// A small collection of scripts to help manage yeti lincences.
+// 
+
+global string $_yla_yetiPluginPath;
+global string $_yla_yetiCheckoutButton;
+
+// Toggles the checkout of a yeti licence. If a licence is in use by this session
+// of maya it will be released otherwise a new one will be attempted to be
+// checked out.
+global proc yetiLicenceActivation() {
+    $pluginPath = _yla_pluginPath();
+    if ("" == $pluginPath) {
+        _yla_notPluginFoundError();
+        return;
+    }
+
+    // Load the yeti plugin if it not already loaded.
+    if (`pluginInfo -q -loaded $pluginPath` == 0) {
+        loadPlugin $pluginPath;
+    }
+
+    if (`pgYetiCommand -licenseStatus`) {
+        releaseYetiLicence();
+    } else {
+        checkoutYetiLicence();
+    }
+}
+
+
+// Returns the checkout sehlfButton for the yeti checkout.
+// If it has not yet been found then it will search for the button through
+// the shelves.
+global proc string _yla_checkoutButton() {
+    global string $_yla_yetiCheckoutButton;
+    if ("" != $_yla_yetiCheckoutButton) {
+        return $_yla_yetiCheckoutButton;
+    }
+
+    // Look for the button on the shelf.
+    global string $gShelfTopLevel;
+    for ($tab in `tabLayout -q -childArray $gShelfTopLevel`) {
+        $stop = 0;
+        for ($button in `shelfLayout -q -childArray $tab`) {
+            if (size(`match "([Ss]eparator)" (string($button))`)) {
+                continue;
+            }
+            $name = `shelfButton -q -label $button`;
+            if (size(`match "(Yeti Licence)" $name`)) {
+                $_yla_yetiCheckoutButton = $button;
+                $stop = 1;
+                break;
+            }
+        }
+        if ($stop) {
+            break;
+        }
+    }
+    return $_yla_yetiCheckoutButton;
+}
+
+
+// Updates the shelf to represent the current status of the 
+// yeti licence.
+global proc _yla_update_shelf() {
+    $button = _yla_checkoutButton();
+    if (`getenv "YETI_INTERACTIVE_LICENSE"`) {
+        shelfButton -e 
+            -i "releaseYeti.svg" 
+            -ann "Release the currently active yeti licence." 
+            $button;
+    } else {
+        shelfButton -e 
+            -i "checkOutYeti.svg" 
+            -ann "Checkout a new yeti licence if one is aviliable." 
+            $button;
+    }
+}
+
+
+// Return the path to the yeti plugin.
+global proc string _yla_pluginPath() {
+    // Return the stored value if it has already been indexed.
+    global string $_yla_yetiPluginPath;
+    if ("" != $_yla_yetiPluginPath) {
+        return $_yla_yetiPluginPath;
+    }
+
+    $env = getenv("MAYA_PLUG_IN_PATH");
+    $paths = stringToStringArray($env, ";");
+
+    // Set the path to the plugin .mll file.
+    for ($path in $paths) {
+        $plugins = `getFileList -folder $path -filespec "*pgYetiMaya.mll"`;
+        if (size($plugins) == 0) {
+            continue;
+        }
+        $_yla_yetiPluginPath = $plugins[0];
+        break;
+    }
+    return $_yla_yetiPluginPath;
+}
+
+// Creates a dialog to inform that the yeti plugin was not found and
+// cannot so canot be used.
+global proc _yla_notPluginFoundError() {
+    print ("Yeti plugin missing from all plugin paths.");
+    confirmDialog 
+        -title "Yeti Plugin" 
+        -m "The Yeti plugin was not found in the plugin directory.\n\
+        The plugin must be aviliable to be activated." 
+        -b "Okay";
+}
+
+
+// Release the current active licence for yeti.
+global proc releaseYetiLicence() {
+    if ("" == _yla_pluginPath()) {
+        _yla_notPluginFoundError();
+        return;
+    }
+    
+    // Release licence.
+    pgYetiCommand -returnLicense;
+    putenv "YETI_INTERACTIVE_LICENSE" 0;
+
+    // Make the shelf fancy looking again.
+    _yla_update_shelf();
+}
+
+
+// Checks out a new liscence if one is aviliable to be used.
+global proc checkoutYetiLicence() {
+    $pluginPath = _yla_pluginPath();
+    if ("" == $pluginPath) {
+        _yla_notPluginFoundError();
+        return;
+    }
+
+    // Load the yeti plugin if it not already loaded.
+    if (`pluginInfo -q -loaded $pluginPath` == 0) {
+        loadPlugin $pluginPath;
+    }
+
+    int $status = `pgYetiCommand -licenseStatus`;
+    
+    // Are we already checked out?
+    if ($status) {
+        print ("Currently already have a licence checked out.");
+        return;
+    }
+
+    // Check if a licence is avliable to checkout.
+    if (`pgYetiCommand -licenseAvailable ` == 0) {
+        print ("There are no yeti licences currently aviliable to use.");
+        confirmDialog 
+            -title "Yeti Checkout" 
+            -m "There are no yeti licences currently aviliable." 
+            -b "Okay";
+        return;
+    }
+
+    putenv "YETI_INTERACTIVE_LICENSE" 1;
+
+    // Make the shelf fancy looking again.
+    _yla_update_shelf();
+}

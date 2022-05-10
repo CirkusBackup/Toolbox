@@ -150,7 +150,7 @@ def addIcons(shelfName, buttons):
                     downloadFile(f'{_GITHUB_RAW}icons/{ico}',
                                  f'{localIconsPath}/{ico}')
                     if ii == 0:
-                        shelfString += ',i1=\'' + ico + '\''
+                        shelfString += f',i1="{ico}"'
         except Exception as e:
             print('file not available')
             print('Exception:', e)
