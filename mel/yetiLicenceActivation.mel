@@ -18,7 +18,17 @@ global proc yetiLicenceActivation() {
 
     // Load the yeti plugin if it not already loaded.
     if (`pluginInfo -q -loaded $pluginPath` == 0) {
-        loadPlugin $pluginPath;
+        $loaded_failed = catchQuiet(`loadPlugin $pluginPath`);
+
+        if ($loaded_failed) {
+            error("Could not load Yeti plugin, is it up to date?");
+            confirmDialog 
+                -title "Yeti Plugin" 
+                -m "The Yeti plugin was not found in the plugin directory.\n\
+                The plugin must be aviliable to be activated." 
+                -b "Okay";
+            return;
+        }
     }
 
     if (`pgYetiCommand -licenseStatus`) {
@@ -123,7 +133,7 @@ global proc releaseYetiLicence() {
     
     // Release licence.
     pgYetiCommand -returnLicense;
-    putenv "YETI_INTERACTIVE_LICENSE" 0;
+    putenv "YETI_INTERACTIVE_LICENSE" "0";
 
     // Make the shelf fancy looking again.
     _yla_update_shelf();
@@ -161,7 +171,7 @@ global proc checkoutYetiLicence() {
         return;
     }
 
-    putenv "YETI_INTERACTIVE_LICENSE" 1;
+    putenv "YETI_INTERACTIVE_LICENSE" "1";
 
     // Make the shelf fancy looking again.
     _yla_update_shelf();
