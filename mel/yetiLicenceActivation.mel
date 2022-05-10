@@ -31,7 +31,7 @@ global proc yetiLicenceActivation() {
         }
     }
 
-    if (`pgYetiCommand -licenseStatus`) {
+    if (getenv("YETI_INTERACTIVE_LICENSE")) {
         releaseYetiLicence();
     } else {
         checkoutYetiLicence();
@@ -52,11 +52,12 @@ global proc string _yla_checkoutButton() {
     global string $gShelfTopLevel;
     for ($tab in `tabLayout -q -childArray $gShelfTopLevel`) {
         $stop = 0;
-        for ($button in `shelfLayout -q -childArray $tab`) {
+        $buttons = `shelfLayout -q -childArray $tab`;
+        for ($button in $buttons) {
             if (size(`match "([Ss]eparator)" (string($button))`)) {
                 continue;
             }
-            $name = `shelfButton -q -label $button`;
+            string $name = `shelfButton -q -label $button`;
             if (size(`match "(Yeti Licence)" $name`)) {
                 $_yla_yetiCheckoutButton = $button;
                 $stop = 1;
@@ -163,7 +164,7 @@ global proc checkoutYetiLicence() {
 
     // Check if a licence is avliable to checkout.
     if (`pgYetiCommand -licenseAvailable ` == 0) {
-        print ("There are no yeti licences currently aviliable to use.");
+        warning ("There are no yeti licences currently aviliable to use.");
         confirmDialog 
             -title "Yeti Checkout" 
             -m "There are no yeti licences currently aviliable." 
@@ -172,6 +173,7 @@ global proc checkoutYetiLicence() {
     }
 
     putenv "YETI_INTERACTIVE_LICENSE" "1";
+    print ("\nActivated yeti licence.");
 
     // Make the shelf fancy looking again.
     _yla_update_shelf();
