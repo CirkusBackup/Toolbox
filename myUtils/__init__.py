@@ -1,2 +1,2 @@
-import shadingNetwork
-import paths
+from . import shadingNetwork
+from . import paths
