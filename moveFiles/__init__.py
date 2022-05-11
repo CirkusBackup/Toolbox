@@ -1,2 +1,2 @@
-import httpDropbox
-import localFiles
+from . import httpDropbox
+from . import localFiles
