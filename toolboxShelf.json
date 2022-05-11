@@ -136,9 +136,9 @@
 			{
 				"icon":"OpenRenderFolder.svg",
 				"label":"Open project folders",
-				"script":"Tools/OpenRenderFolder.py",
+				"script":"myUtils/paths.py",
 				"command":"",
-				"stp":"python",
+				"stp":"mel",
 				"menuItem-click-type": "left",
 				"menuItem":[
 					{
@@ -147,22 +147,22 @@
 					},
 					{
 						"label":"images",
-						"command":"import myUtils.path as path; path.open_project_dir('images')",
+						"command":"import myUtils.paths as path; path.open_project_dir('images')",
 						"stp":"python"
 					},
 					{
 						"label":"images-tmp",
-						"command":"import myUtils.path as path; path.open_project_dir('images-tmp')",
+						"command":"import myUtils.paths as path; path.open_project_dir('images-tmp')",
 						"stp":"python"
 					},
 					{
 						"label":"sourceimages",
-						"command":"import myUtils.path as path; path.open_project_dir('sourceimages')",
+						"command":"import myUtils.paths as path; path.open_project_dir('sourceimages')",
 						"stp":"python"
 					},
 					{
 						"label":"scenes",
-						"command":"import myUtils.path as path; path.open_project_dir('scenes')",
+						"command":"import myUtils.paths as path; path.open_project_dir('scenes')",
 						"stp":"python"
 					},
 					{
@@ -171,22 +171,22 @@
 					},
 					{
 						"label":"REF",
-						"command":"import myUtils.path as path; path.open_project_dir('REF')",
+						"command":"import myUtils.paths as path; path.open_project_dir('REF')",
 						"stp":"python"
 					},
 					{
 						"label":"ANIM",
-						"command":"import myUtils.path as path; path.open_project_dir('ANIM')",
+						"command":"import myUtils.paths as path; path.open_project_dir('ANIM')",
 						"stp":"python"
 					},
 					{
 						"label":"RENDER",
-						"command":"import myUtils.path as path; path.open_project_dir('RENDER')",
+						"command":"import myUtils.paths as path; path.open_project_dir('RENDER')",
 						"stp":"python"
 					},
 					{
 						"label":"FX",
-						"command":"import myUtils.path as path; path.open_project_dir('FX')",
+						"command":"import myUtils.paths as path; path.open_project_dir('FX')",
 						"stp":"python"
 					}
 				]
