@@ -86,9 +86,9 @@ global proc multiRef() {
 	// Create the window elements
 	$win = `window -w 150 -h 200 -s false -title "Multi Importer" "multiref_window"`;
 
-    string $abouttxt = "Select multiple files to be imported at once. Set if the files";
-    $abouttxt += "will be imported or refernced before selecting the in this window.";
-    $abouttxt += "Instance count lets you set how myn instances of each file will be imported / refernced.";
+    string $abouttxt = "Select multiple files to be imported at once. Set if the files ";
+    $abouttxt += "will be imported or refernced before selecting them in this window. ";
+    $abouttxt += "Instance count lets you set how many instances of each file will be imported / refernced.";
 
 	columnLayout -adj 1 -co "both" 20;
 		text -w 100 -h 100 -label $abouttxt -ww true -align "left";
