@@ -73,7 +73,7 @@ def downloadFile(remote: str, local: str):
         block_size = 8192
         cur_block = 0
 
-        print ('')
+        print('')
         print(f'Starting download of file {remote} ({total_size} bytes)...')
 
         # Start downloading chunks
@@ -90,7 +90,6 @@ def downloadFile(remote: str, local: str):
                     print(f'Done: {local}')
                 else:
                     print(f'    {percent:.2f}%')
-
 
 
 def checkGroups(shelfName):
@@ -133,8 +132,8 @@ def addIcons(shelfName, buttons):
                      vis=True, maxValue=len(buttons) - 1)
 
     # loop through dictionary
-    for i, btn in enumerate(buttons):
-        shelfElements = buttons[i]
+    for i, name in enumerate(buttons):
+        btn = buttons[i]
         shelfString = 'cmds.shelfButton(rpt=True'
         # download icons from github
         try:
@@ -202,15 +201,39 @@ def addIcons(shelfName, buttons):
             removeButton(shelfName, label)
 
         # add icons to shelf
-        currentButton = eval(shelfString)
+        shelf_btn = eval(shelfString)
 
-        try:
-            mi = buttons[i]['menuItem']
-            for i, l in enumerate(mi):
-                cmds.shelfButton(currentButton, edit=True, mi=(
-                    mi[i]['label'], mi[i]['command']))
-        except Exception:
-            pass
+        # Create a dropdown menu
+        if 'menuItem' in btn:
+            click_type = 'right'
+            if 'menuItem-click-type' in btn:
+                click_type = btn['menuItem-click-type'].lower()
+                if click_type not in ['left, right']:
+                    click_type = 'right'
+
+            menus = btn['menuItem']
+
+            # Create a new left click menu and add the menu items
+            # to that popup.
+            if click_type == 'left':
+                popup = cmds.popupMenu(button=1)
+                for mi in menus:
+                    item = menus[mi]
+                    cmds.menuItem(
+                        l=item.get('label', 'Unlabeled Item'),
+                        d=item.get('divider', False),
+                        command=item.get('command', ''),
+                        p=popup
+                    )
+            # Add items to the shelf button in the right
+            # click menu.
+            else:
+                for mi in menus:
+                    item = menus[mi]
+                    cmds.shelfButton(
+                        shelf_btn, e=True,
+                        mi=(item['label'], item['command'])
+                    )
 
 
 def CheckText():
