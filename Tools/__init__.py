@@ -1,6 +1,6 @@
-import backpack
-import incrementalSaveUI
-import OpenRenderFolder
-import playAnimatic
-import toSlack
-import materialSwitch
+from . import backpack
+from . import incrementalSaveUI
+from . import OpenRenderFolder
+from . import playAnimatic
+from . import toSlack
+from . import materialSwitch
