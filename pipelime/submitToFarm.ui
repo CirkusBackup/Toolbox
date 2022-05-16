@@ -1005,6 +1005,9 @@ background-image: url(/icon/io_ANIMOUT.png);
           <property name="text">
            <string>Ignore Errors</string>
           </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
