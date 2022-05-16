@@ -1,7 +1,13 @@
 global proc RSTessellate(){
-    if(`window -exists RSTessellateUI`){
+    // Dont continue if the redshift plugin cannot load.
+    if (!_rs_enable_plugin()) {
+        return;
+    }
+
+    if (`window -exists RSTessellateUI`) {
         deleteUI RSTessellateUI;
     }
+
     window -wh 100 75 -rtf 1 -mxb 0 -title "Redshift Tessellate Tool" RSTessellateUI;
     columnLayout mainCol;
     formLayout -w 150 -h 75  mainForm;
@@ -18,16 +24,13 @@ global proc RSTessellate(){
     showWindow RSTessellateUI;
 }
 
-global proc RSSmooth ()
-{
+global proc RSSmooth () {
     int $intID = `intField -q -v subCall`;
     
     string $sel[] = `ls -sl`;
-    for( $item in $sel)
-    {
+    for( $item in $sel) {
         string $shapes[] = `listRelatives -s -path $item`;
-        for( $shape in $shapes)
-        {
+        for( $shape in $shapes) {
             setAttr ($shape + ".rsEnableSubdivision") 1;
             setAttr ($shape + ".rsMaxTessellationSubdivs") $intID;
         }

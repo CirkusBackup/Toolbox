@@ -1,4 +1,8 @@
 global proc RSObjectId(){
+    // Dont continue if the redshift plugin cannot load.
+    if (!_rs_enable_plugin()) {
+        return;
+    }
 
 	if (`window -ex RSIDWindow` == 1){
 		deleteUI RSIDWindow;
@@ -15,38 +19,39 @@ global proc RSObjectId(){
 	showWindow RSIDWindow;
 }
 
-global proc assignID (){
-	    
-	    int $intID = `intSliderGrp -q -value "IDSlider"`;
-	    
-	    string $sel[] = `ls -sl`;
+global proc assignID () {
+    // Dont continue if the redshift plugin cannot load.
+    if (!_rs_enable_plugin()) {
+        return;
+    }
 
-		for( $item in $sel)
-		{
-			string $shapes[] = `listRelatives -s -path $item`;
-			for( $shape in $shapes)
-			{
-				setAttr ($shape + ".rsObjectId") $intID;
-			}
+	int $intID = `intSliderGrp -q -value "IDSlider"`;
+	string $sel[] = `ls -sl`;
+
+	for ($item in $sel) {
+		string $shapes[] = `listRelatives -s -path $item`;
+		for ($shape in $shapes) {
+			setAttr ($shape + ".rsObjectId") $intID;
 		}
-
+	}
 }
 
 global proc selectID (){
+    // Dont continue if the redshift plugin cannot load.
+    if (!_rs_enable_plugin()) {
+        return;
+    }
     
     int $intID = `intSliderGrp -q -value "IDSlider"`;
     
 	select -cl;
 	string $allgeo[] = `ls -g`;
-	for( $item in $allgeo)
-	{
-    	if(`attributeExists "rsObjectId" $item`)
-    	{
-        	if(`getAttr ($item + ".rsObjectId")` == $intID)
-        	{
-            	select -tgl $item;
-        	}
-    	}
+	for ($item in $allgeo) {
+		if(`attributeExists "rsObjectId" $item`) {
+			if(`getAttr ($item + ".rsObjectId")` == $intID) {
+				select -tgl $item;
+			}
+		}
 	}
 }
 

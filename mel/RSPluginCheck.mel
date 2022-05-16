@@ -1,0 +1,17 @@
+// Checks if the redshift plugin is a registered plugin with maya, if it
+// is then it will attempt to load the plugin if it's not already.
+//
+// Returns either 1 or 0 depending if the plugin is or was loaded successfully.
+global proc int _rs_enable_plugin() {
+    int $loaded = `pluginInfo -q -loaded "redshift4maya"`;
+    if ($loaded) {
+        return true;
+    }
+    // Atempt to load redshift
+    $attempt = catchQuiet(`loadPlugin -quiet "redshift4maya"`);
+    if ($attempt) {
+        warning "Cannot load Redshift plugin. Is it up to date?";
+        return false;
+    }
+    return true;
+}

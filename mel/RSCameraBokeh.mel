@@ -1,5 +1,9 @@
-global proc RSCameraBokeh()
-{
+global proc RSCameraBokeh() {
+    // Dont continue if the redshift plugin cannot load.
+    if (!_rs_enable_plugin()) {
+        return;
+    }
+    
     string $sel[] = `ls -sl`;
     int $selectionSize = `size $sel`;
     string $cameraCheck = nodeType(`listRelatives -s $sel`);
@@ -42,4 +46,3 @@ global proc RSCameraBokeh()
         error ("no camera selected");
     }
 }
-//RSCameraBokeh();
