@@ -316,8 +316,9 @@
 		]
 	},
 	"Redshift":{
-		"dependencies":[
-		],
+		"dependencies": {
+			"scripts": ["RSPluginCheck.mel"]
+		},
 		"buttons": [
 			{
 				"icon":"RSTessellate.svg",

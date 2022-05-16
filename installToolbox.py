@@ -5,6 +5,10 @@ import os
 import urllib.request as request
 from collections import OrderedDict
 
+
+# TODO add dependency handling for when the tool is being intsalled.
+
+
 # Define constants
 _GITHUB_RAW = 'https://raw.githubusercontent.com/CirkusBackup/Toolbox/main/'
 
