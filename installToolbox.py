@@ -395,7 +395,4 @@ def toolbox_install():
     cmds.workspaceControl(workspaceName, initialHeight=250,
                           initialWidth=200, uiScript='installToolboxWindow()')
 
-# toolbox_install()
 
-# import installToolbox
-# installToolbox.toolbox_install()
