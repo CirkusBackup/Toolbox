@@ -5,8 +5,9 @@ import os
 import urllib.request as request
 from collections import OrderedDict
 
-
 # TODO add dependency handling for when the tool is being intsalled.
+# TODO Add option to install from local directory which will default to
+#      either, your Z://.. or if locally on a workstation from \\bigtop\job3...
 
 
 # Define constants
@@ -96,6 +97,44 @@ def downloadFile(remote: str, local: str):
                     print(f'    {percent:.2f}%')
 
 
+def _local_scripts_path() -> str:
+    """Returns the local script's directory path"""
+    return f'{cmds.optionMenu("scriptsMenu", query=True, v=True)}'
+
+
+def _local_icons_path() -> str:
+    """Returns the local icon's directory path"""
+    return f'{cmds.optionMenu("iconsMenu", query=True, v=True)}'
+
+
+def install_dependencies(dependencies: dict):
+    """
+    Installs dependencies from the provided dictionary.
+    This accepts the following as string arrays in the dict:
+    - scripts
+    - icons
+    """
+
+    def _install(d, name, remote_path, local_path):
+        if name not in d:
+            return
+        data = d[name]
+        if isinstance(data, str):
+            downloadFile(
+                f'{remote_path}{data}',
+                f'{local_path}{data}'
+            )
+        else:
+            for file in data:
+                downloadFile(
+                    f'{remote_path}{file}',
+                    f'{local_path}{file}'
+                )
+
+    _install(dependencies, 'scripts', f'{_GITHUB_RAW}', f'{_local_scripts_path()}/')
+    _install(dependencies, 'icons', f'{_GITHUB_RAW}icons/', f'{_local_icons_path()}/')
+
+
 def checkGroups(shelfName):
     # check that shelf exists
     createShelf(shelfName)
@@ -135,7 +174,7 @@ def _create_shelf_popups(parent: str, click_type: str, menus: list):
     if 'left' in click_type:
         popup = cmds.popupMenu(button=1, p=parent)
         for item in menus:
-            print (item)
+            print(item)
             cmds.menuItem(
                 l=item.get('label', 'Unlabeled Item'),
                 d=item.get('divider', False),
@@ -164,7 +203,7 @@ def addIcons(shelfName, buttons):
 
     # loop through dictionary
     for i, name in enumerate(buttons):
-        btn = buttons[i]
+        btn: dict = buttons[i]
         shelfString = 'cmds.shelfButton(rpt=True'
         # download icons from github
         try:
@@ -188,6 +227,9 @@ def addIcons(shelfName, buttons):
             shelfString += ',i1=\'commandButton.png\''
         # update progress
         cmds.progressBar('progressControl', edit=True, step=1)
+
+        if 'dependencies' in btn:
+            install_dependencies(btn['dependencies'])
 
         # download script from github
         if scriptsMenuI > 1:
@@ -238,7 +280,6 @@ def addIcons(shelfName, buttons):
         if 'menuItem' in btn:
             click_type = btn.get('menuItem-click-type', 'right').lower()
             _create_shelf_popups(shelf_btn, click_type, btn.get('menuItem', []))
-
 
 
 def CheckText():
@@ -354,42 +395,44 @@ def installToolboxWindow():
     except Exception:
         pass
 
-    cmds.formLayout(installForm, edit=True,
-                    attachForm=[
-                        (textLabel, 'top', 15),
-                        (textLabel, 'left', 10),
-                        (nameText, 'top', 10),
-                        (nameText, 'right', 10),
-                        (scriptsMenu, 'right', 10),
-                        (iconsMenu, 'right', 10),
-                        (jsonPathBtn, 'right', 10),
-                        (progressControl, 'left', 10),
-                        (progressControl, 'right', 10),
-                        (btn1, 'bottom', 0),
-                        (btn1, 'left', 0),
-                        (btn2, 'bottom', 0),
-                        (btn2, 'right', 0)
-                    ],
-                    attachControl=[
-                        (nameText, 'left', 10, textLabel),
-                        (scriptsMenu, 'top', 10, textLabel),
-                        (scriptsMenu, 'left', 10, textLabel),
-                        (iconsMenu, 'top', 10, scriptsMenu),
-                        (iconsMenu, 'left', 10, textLabel),
-                        (jsonPathText, 'top', 10, iconsMenu),
-                        (jsonPathBtn, 'top', 10, iconsMenu),
-                        (jsonPathText, 'left', 10, textLabel),
-                        (jsonPathText, 'right', 10, jsonPathBtn),
-                        (progressControl, 'top', 20, jsonPathText),
-                        (progressControl, 'left', 10, textLabel),
-                        (listLayout, 'top', 20, jsonPathText),
-                        (listLayout, 'left', 10, textLabel),
-                        (btn2, 'left', 0, btn1)
-                    ],
-                    attachPosition=[
-                        (btn1, 'right', 0, 50)
-                    ]
-                    )
+    # Layout elements
+    cmds.formLayout(
+        installForm, edit=True,
+        attachForm= [
+            (textLabel, 'top', 15),
+            (textLabel, 'left', 10),
+            (nameText, 'top', 10),
+            (nameText, 'right', 10),
+            (scriptsMenu, 'right', 10),
+            (iconsMenu, 'right', 10),
+            (jsonPathBtn, 'right', 10),
+            (progressControl, 'left', 10),
+            (progressControl, 'right', 10),
+            (btn1, 'bottom', 0),
+            (btn1, 'left', 0),
+            (btn2, 'bottom', 0),
+            (btn2, 'right', 0)
+        ],
+        attachControl= [
+            (nameText, 'left', 10, textLabel),
+            (scriptsMenu, 'top', 10, textLabel),
+            (scriptsMenu, 'left', 10, textLabel),
+            (iconsMenu, 'top', 10, scriptsMenu),
+            (iconsMenu, 'left', 10, textLabel),
+            (jsonPathText, 'top', 10, iconsMenu),
+            (jsonPathBtn, 'top', 10, iconsMenu),
+            (jsonPathText, 'left', 10, textLabel),
+            (jsonPathText, 'right', 10, jsonPathBtn),
+            (progressControl, 'top', 20, jsonPathText),
+            (progressControl, 'left', 10, textLabel),
+            (listLayout, 'top', 20, jsonPathText),
+            (listLayout, 'left', 10, textLabel),
+            (btn2, 'left', 0, btn1)
+        ],
+        attachPosition=[
+            (btn1, 'right', 0, 50)
+        ]
+    )
 
 
 def toolbox_install():
@@ -400,3 +443,4 @@ def toolbox_install():
                           initialWidth=200, uiScript='installToolboxWindow()')
 
 
+toolbox_install()
