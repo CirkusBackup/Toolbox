@@ -1,8 +1,10 @@
 import json
 import os.path
+import inspect
 
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import *
+from PySide2.QtGui import QIcon
 from maya import cmds
 from maya.OpenMayaUI import MQtUtil
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
@@ -140,7 +142,46 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
     @property
     def is_local_install(self) -> bool:
-        return self._install_from_options.currentText()
+        return self._install_from_options.currentIndex()
+
+    def _browse_for_install(self):
+        responce = QFileDialog.getExistingDirectory(
+            parent=self,
+            caption='Select install directory',
+            directory=os.getcwd()
+        )
+
+        print(responce)
+
+    def _ui_install_build(self) -> QLayout:
+        """
+        Builds UI elements to handle the options of switching between a remote
+        or local installation.
+        """
+        layout = QFormLayout()
+
+        # Install Type
+        self._install_from_options = QComboBox()
+        self._install_from_options.addItems(['Remote Install', 'Local Install'])
+
+        local_layout = QHBoxLayout()
+        local_widget = QWidget(layout=local_layout, visible=self._install_from_options.currentIndex())
+        open_search_btn = QPushButton(icon=QIcon(':/folder-open.png'))
+        self._install_local_path = QLineEdit(disabled=True)
+        local_layout.addWidget(self._install_local_path)
+        local_layout.addWidget(open_search_btn)
+
+        local_dir = inspect.getfile(lambda: None)
+        self._install_local_path.setText(f'{local_dir}/toolboxShelf.json')
+
+        layout.addRow(QLabel('Install From'), self._install_from_options)
+        layout.addRow(QLabel(''), local_widget)
+
+        # Make Connections
+        self._install_from_options.currentIndexChanged.connect(lambda x: local_widget.setVisible(x))
+        open_search_btn.clicked.connect(lambda x: self._browse_for_install())
+
+        return layout
 
     def _build_ui(self):
         """
@@ -157,8 +198,6 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         options_layout.setHorizontalSpacing(30)
 
         # Install Type
-        self._install_from_options = QComboBox()
-        self._install_from_options.addItems(['Remote Install', 'Local Install'])
         scripts_install_loc = QComboBox()
         icons_install_loc = QComboBox()
         shelf_name = QLineEdit(placeholderText='CoolTool')
@@ -166,7 +205,7 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         scripts_install_loc.addItem('Manually Install')
         icons_install_loc.addItem('Install path..')
 
-        options_layout.addRow(QLabel('Install From'), self._install_from_options)
+        # options_layout.addRow(QLabel('Install From'), self._install_from_options)
         options_layout.addRow(QLabel('Scripts Path'), scripts_install_loc)
         options_layout.addRow(QLabel('Icons Path'), icons_install_loc)
         options_layout.addRow(QLabel('Shelf Name'), shelf_name)
@@ -207,6 +246,7 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
         # Add all the layouts and set it to the widget
         layout.addLayout(heading)
+        layout.addLayout(self._ui_install_build())
         layout.addLayout(options_layout)
         layout.addWidget(QLabel('<h3>Available Tools to Install</h3>'))
         layout.addLayout(modules_layout)
@@ -226,23 +266,28 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         """Updates all UI elements for the tools that can be installed."""
         pass
 
-    def _fetch_tools_data(self) -> Optional[dict]:
+    def _load_shelf_data(self, shelves: dict):
+        pass
+
+    def _fetch_tools_data(self):
         """
         Fetches the data for the installer. This will check in multiple
         locations depending on if it is being selected as a remote or local
         installiation.
         """
-        # Attempt to download the tool's data from the repo.
+        # Attempt to download the tool's data from the repo online.
         if not self.is_local_install:
-            pass
+            data = download_data(f'{_REPO}toolboxShelf.json')
+            self._load_shelf_data(json.loads(data))
+            return
 
+        # Load from file
         local_path = os.path.dirname(__file__)
-        data = None
         if local_path is not None:
             file = os.path.join(local_path, 'toolboxShelf.json')
-            return json.loads(file)
-
-        return None
+            if os.path.exists(file):
+                self._load_shelf_data(json.loads(file))
+                return
 
 
 if __name__ == '__main__':
