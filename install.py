@@ -76,7 +76,7 @@ def download_data(url: str, local: str = None) -> Optional[str]:
             block = r.read(8129)
             if not block:
                 break
-            data += block
+            data += block.decode('utf-8')
 
     with request.urlopen(url) as req:
         # head = req.info()
@@ -120,6 +120,67 @@ def install_shelf():
     pass
 
 
+class RowColumnWidget(QWidget):
+    """Simple widget to build a set of rows and columns"""
+
+    def __init__(self, columns: int = 2):
+        super(RowColumnWidget, self).__init__()
+
+        # Have a min value of 1
+        if columns < 1:
+            columns = 1
+
+        self.columns = columns
+        self._widgets = []
+        self._columns = []
+
+        self._layout = QHBoxLayout()
+        self.setLayout(self._layout)
+
+        for i in range(columns):
+            layout_base = QVBoxLayout()
+            layout = QVBoxLayout()
+            layout_base.addLayout(layout)
+            layout_base.addStretch()
+            self._layout.addLayout(layout_base)
+            self._columns.append(layout)
+
+        self.adjustSize()
+
+    def addWidget(self, widget: QWidget):
+        self._widgets.append(widget)
+        col = self.columns - 1 - len(self._widgets) % self.columns
+        self._columns[col].addWidget(widget)
+
+    def reset(self):
+        widget: QWidget
+        for widget in self._widgets:
+            widget.deleteLater()
+            widget.setParent(None)
+        self._widgets.clear()
+
+
+class ToolButtonWidget(QPushButton):
+
+    def __init__(self, *args, **kwargs):
+        super(ToolButtonWidget, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setCheckable(True)
+
+        self.setStyleSheet('''
+        ToolButtonWidget {
+            background: transparent;
+            border: 3px solid #5D5D5D;
+            padding-top: 7px;
+            padding-bottom: 7px;
+            border-radius: 8px;
+        }
+        ToolButtonWidget:checked {
+            border-color: #709B64;
+        }
+        ''')
+
+
 class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
     def __init__(self):
@@ -131,27 +192,71 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         self.setWindowTitle(W_TITLE)
         self.setWindowFlags(Qt.Window)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.setFixedWidth(400)
-        self.setMaximumWidth(700)
+        # self.setFixedWidth(400)
+        # self.setMaximumWidth(700)
 
-        self._toolbox_data = None
+        # Define base vars
+        self._local_toolbox_dir: Optional[str] = None  # local install dir
+        self._toolbox_data: Optional[dict] = None  # all data from toolboxShelf.json
+        self._tools_list_widget = RowColumnWidget(2)
+        self._remote_data: Optional[dict] = None
+
+        self.splash = self._ui_install_progress_splash()
 
         # Build the UI
         self._build_ui()
-        self.adjustSize()
+        self._check_install_state()
 
     @property
     def is_local_install(self) -> bool:
         return self._install_from_options.currentIndex()
 
-    def _browse_for_install(self):
+    def _check_install_state(self):
+        """
+        Sets the state of the install button to be enabled or disabled
+        depending on if all parameters are valid. This will also update
+        the listed tools in the UI to match if it is sourcing from either
+        remote or local paths.
+        """
+        self._fetch_tools_data()
+        if self.is_local_install:
+            if self._local_toolbox_dir is None:
+                self.install_btn.setEnabled(False)
+                self._load_tools(None)
+                return
+        self._load_tools(self._remote_data)
+        self.install_btn.setEnabled(True)
+
+    def _select_install_dir(self):
+        """
+        Opens a dialog to select the directory where the Cirkus Toolbox tools are located.
+        If the directory does not have the required files to install the tools from then
+        a warning will be shown and not be set.
+        """
         responce = QFileDialog.getExistingDirectory(
             parent=self,
             caption='Select install directory',
             directory=os.getcwd()
         )
 
-        print(responce)
+        # ignore cancels
+        if responce is None or len(responce) == 0:
+            return
+
+        # Check if the required files are in the directory to install with
+        files = os.listdir(responce)
+        if 'toolboxShelf.json' not in files:
+            cmds.warning('Invalid Install Directory. This does not contain the required data to install the Cirkus '
+                         'Toolbox with.')
+            self._check_install_state()
+            self._load_tools(None)
+            return
+
+        # Update internal vars and UI
+        self._local_toolbox_dir = responce
+        self._install_local_text.setText(responce)
+        self._check_install_state()
+        self._fetch_tools_data()
 
     def _ui_install_build(self) -> QLayout:
         """
@@ -159,6 +264,10 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         or local installation.
         """
         layout = QFormLayout()
+        layout.setContentsMargins(30, 30, 30, 0)
+        layout.setHorizontalSpacing(30)
+
+        content_layout = QHBoxLayout()
 
         # Install Type
         self._install_from_options = QComboBox()
@@ -167,21 +276,33 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         local_layout = QHBoxLayout()
         local_widget = QWidget(layout=local_layout, visible=self._install_from_options.currentIndex())
         open_search_btn = QPushButton(icon=QIcon(':/folder-open.png'))
-        self._install_local_path = QLineEdit(disabled=True)
-        local_layout.addWidget(self._install_local_path)
+        self._install_local_text = QLineEdit(disabled=True)
+        local_layout.addWidget(self._install_local_text)
         local_layout.addWidget(open_search_btn)
 
-        local_dir = inspect.getfile(lambda: None)
-        self._install_local_path.setText(f'{local_dir}/toolboxShelf.json')
+        local_layout.setContentsMargins(0, 0, 0, 0)
 
-        layout.addRow(QLabel('Install From'), self._install_from_options)
-        layout.addRow(QLabel(''), local_widget)
+        local_dir = inspect.getfile(lambda: None)
+        if '<maya console>' in local_dir:
+            local_dir = ''
+        self._install_local_text.setText(local_dir)
+
+        content_layout.addWidget(self._install_from_options)
+        content_layout.addWidget(local_widget)
+
+        layout.addRow(QLabel('Install From'), content_layout)
+        # layout.addRow(QLabel(''), local_widget)
 
         # Make Connections
-        self._install_from_options.currentIndexChanged.connect(lambda x: local_widget.setVisible(x))
-        open_search_btn.clicked.connect(lambda x: self._browse_for_install())
+        self._install_from_options.currentIndexChanged.connect(lambda x: (
+            local_widget.setVisible(x), self._check_install_state()
+        ))
+        open_search_btn.clicked.connect(lambda x: self._select_install_dir())
 
         return layout
+
+    def _ui_install_progress_splash(self) -> QLayout:
+        pass
 
     def _build_ui(self):
         """
@@ -189,11 +310,21 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         """
         layout = QVBoxLayout()
 
-        self.setStyleSheet('QComboBox { padding: 5px 10px; } #install-btn { background: #709B64; }')
+        # Some simple styling
+        self.setStyleSheet('''
+        QComboBox { padding: 5px 10px; } 
+        #install-btn { background: #709B64; border-radius: 8px; }
+        #install-btn:hover { background: #97C989; }
+        #install-btn:pressed { background: #3F5838; }
+        #install-btn:disabled { background: #5E7059; }
+        #cancel-btn { background: #5D5D5D; border-radius: 8px; }
+        #cancel-btn:hover { background: #787878; }
+        #cancel-btn:pressed { background: #2B2B2B; }
+        ''')
 
         # Install options
         options_layout = QFormLayout()
-        options_layout.setContentsMargins(30, 30, 30, 30)
+        options_layout.setContentsMargins(30, 0, 30, 30)
         options_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         options_layout.setHorizontalSpacing(30)
 
@@ -203,7 +334,6 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         shelf_name = QLineEdit(placeholderText='CoolTool')
 
         scripts_install_loc.addItem('Manually Install')
-        icons_install_loc.addItem('Install path..')
 
         # options_layout.addRow(QLabel('Install From'), self._install_from_options)
         options_layout.addRow(QLabel('Scripts Path'), scripts_install_loc)
@@ -211,30 +341,22 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         options_layout.addRow(QLabel('Shelf Name'), shelf_name)
 
         # Add all the paths to the dropdown options.
-        script_paths = os.getenv('MAYA_SCRIPT_PATH').split(';')
-        icon_paths = os.getenv('XBMLANGPATH').split(';')
+        script_paths: list = os.getenv('MAYA_SCRIPT_PATH').split(';')
+        icon_paths: list = os.getenv('XBMLANGPATH').split(';')
 
-        for path in script_paths:
+        # Add all aviliable install paths in excluding system paths
+        for path in filter(lambda x: '/Program' not in x and len(x) > 0, script_paths):
             scripts_install_loc.addItem(path)
-        for path in icon_paths:
+        for path in filter(lambda x: '/Program' not in x and len(x) > 0, icon_paths):
             icons_install_loc.addItem(path)
-
-        # List of installable tools
-        modules_layout = QVBoxLayout()
-        modules_layout.setContentsMargins(30, 10, 0, 0)
-
-        for i in range(10):
-            tool = QCheckBox(f'Tool Name {i}')
-            tool.setContentsMargins(30, 20, 0, 0)
-            modules_layout.addWidget(tool)
 
         # Main operation buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setContentsMargins(0, 20, 0, 0)
-        cancel_btn = QPushButton('Cancel', fixedHeight=50)
-        install_btn = QPushButton('Install', objectName='install-btn', fixedHeight=50)
+        cancel_btn = QPushButton('Cancel', objectName='cancel-btn', fixedHeight=50)
+        self.install_btn = QPushButton('Install', objectName='install-btn', fixedHeight=50)
 
-        buttons_layout.addWidget(install_btn)
+        buttons_layout.addWidget(self.install_btn)
         buttons_layout.addWidget(cancel_btn)
 
         # Create heading layout and labels
@@ -248,8 +370,9 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         layout.addLayout(heading)
         layout.addLayout(self._ui_install_build())
         layout.addLayout(options_layout)
-        layout.addWidget(QLabel('<h3>Available Tools to Install</h3>'))
-        layout.addLayout(modules_layout)
+        layout.addWidget(QLabel('<h3 align="center">Available Tools to Install</h3>'))
+        # layout.addLayout(modules_layout)
+        layout.addWidget(self._tools_list_widget)
         layout.addStretch()
         layout.addLayout(buttons_layout)
         self.setLayout(layout)
@@ -258,16 +381,29 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         """
         Runs the installer
         """
+        # TODO  If this is a local install check that the install path is valid before
+        #       continuting.
         # Handle invalid data to install from
         if self._toolbox_data is None:
-            pass
+            return
 
-    def _update_tools(self):
-        """Updates all UI elements for the tools that can be installed."""
-        pass
+    def _load_tools(self, shelves: Optional[dict]):
+        """
+        Loads all the tools into memory and updates the UI elements to reflect all
+        the aviliable tools that can be installed.
+        """
+        self._toolbox_data = shelves
 
-    def _load_shelf_data(self, shelves: dict):
-        pass
+        # Remove all old widgets from list
+        self._tools_list_widget.reset()
+
+        if shelves is None:
+            return
+
+        # Update UI Elements
+        for tool in shelves:
+            widget = ToolButtonWidget(tool, parent=self)
+            self._tools_list_widget.addWidget(widget)
 
     def _fetch_tools_data(self):
         """
@@ -277,17 +413,17 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         """
         # Attempt to download the tool's data from the repo online.
         if not self.is_local_install:
-            data = download_data(f'{_REPO}toolboxShelf.json')
-            self._load_shelf_data(json.loads(data))
+            if self._remote_data is None:
+                data = download_data(f'{_REPO}toolboxShelf.json')
+                self._remote_data = json.loads(data)
+            self._load_tools(self._remote_data)
             return
 
         # Load from file
-        local_path = os.path.dirname(__file__)
-        if local_path is not None:
-            file = os.path.join(local_path, 'toolboxShelf.json')
-            if os.path.exists(file):
-                self._load_shelf_data(json.loads(file))
-                return
+        if self._local_toolbox_dir is not None:
+            file = os.path.join(self._local_toolbox_dir, 'toolboxShelf.json')
+            with open(file, 'r') as content:
+                self._load_tools(json.loads(content.read()))
 
 
 if __name__ == '__main__':
