@@ -104,6 +104,7 @@
 			{
 				"icon":"rivet.svg",
 				"label":"Makes rivet between two edges",
+				"script": "mel/rivet.mel",
 				"command":"source rivet;rivet;",
 				"stp":"mel"
 			},
@@ -234,6 +235,7 @@
 	},
 	"Yeti":{
 		"dependencies":[
+
 		],
 		"buttons": [
 			{
@@ -443,17 +445,9 @@
 		],
 		"buttons": [
 			{
-				"icon":"icecream.svg",
-				"label":"icecream?",
-				"script":"Tools/toSlack.py",
-				"command":"import Tools.toSlack;toSlack.icecreamBot()",
-				"modules": ["Tools/__init__.py"],
-				"stp":"python"
-			},
-			{
 				"icon":"installToolbox.svg",
 				"label":"install or update toolbox",
-				"script":"installToolbox.mel",
+				"script":"mel/installToolbox.mel",
 				"command":"source installToolbox;installToolbox;",
 				"stp":"mel"
 			}

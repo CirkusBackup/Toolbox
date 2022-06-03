@@ -1,11 +1,17 @@
+import asyncio
 import json
 import os.path
 import inspect
+import re
+import shutil
+import time
+import traceback
 
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import *
 from PySide2.QtGui import QIcon
 from maya import cmds
+from maya import mel
 from maya.OpenMayaUI import MQtUtil
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
 from shiboken2 import wrapInstance
@@ -61,6 +67,9 @@ def download_data(url: str, local: str = None) -> Optional[str]:
     data = None
     to_file = local is not None
 
+    if to_file and not os.path.exists(os.path.dirname(local)):
+        os.makedirs(os.path.dirname(local))
+
     def write_file(r, f):
         while True:
             block = r.read(8129)
@@ -79,10 +88,6 @@ def download_data(url: str, local: str = None) -> Optional[str]:
             data += block.decode('utf-8')
 
     with request.urlopen(url) as req:
-        # head = req.info()
-        # total_size = int(head['Content-Length'])
-        # block_size = 8129
-        # cur_block = 0
         if to_file:
             with open(local, 'wb') as file:
                 write_file(req, file)
@@ -92,32 +97,106 @@ def download_data(url: str, local: str = None) -> Optional[str]:
     return data
 
 
-class InstallData:
-
-    def __int__(self):
-        self._data = None
-
-    def collect(self):
-        pass
-
-    def get(self) -> dict:
-        pass
-
-
 def _clean_up():
     """Cleans up all instances of the installation window from maya."""
     _maya_delete_ui(W_TITLE, W_OBJ)
     _maya_delete_workspace(W_OBJ)
 
 
-def install_file():
-    # TODO
-    pass
+def create_shelf(name):
+    """Creates a new shelf if it does not already exist"""
+    exists = name in cmds.layout('ShelfLayout', q=True, ca=True)
+    if not exists:
+        print(f'Creating new shelf {name} to install the tools into.')
+        mel.eval(f'addNewShelfTab("{name}")')
 
 
-def install_shelf():
-    # TODO
-    pass
+def _create_shelf_popups(parent: str, click_type: str, menus: list):
+    """
+    Adds all the configured popup menu items to a shelf button.
+    """
+    # Create a new left click menu and add the menu items
+    # to that popup.
+    if 'left' in click_type:
+        popup = cmds.popupMenu(button=1, p=parent)
+        for item in menus:
+            print(item)
+            cmds.menuItem(
+                l=item.get('label', 'Unlabeled Item'),
+                d=item.get('divider', False),
+                command=item.get('command', ''),
+                p=popup
+            )
+        return
+
+    # Add items to the shelf button in the right
+    # click menu.
+    for item in menus:
+        cmds.shelfButton(
+            parent, e=True,
+            mi=(item['label'], item['command'])
+        )
+
+
+def create_shelf_button(parent: str, btn_data: dict):
+    """
+    Creates a new shelf button from the given data.
+    """
+    label = btn_data.get('label', 'Undefined Button')
+    icon = btn_data.get('icon', 'commandButton.png')
+    cmd = btn_data.get('command', '')
+    stp = btn_data.get('stp', 'mel')
+    sbm = btn_data.get('sbm', '')
+
+    if icon == 'separator':
+        # Make it a seperator if it is one
+        cmds.separator(p=parent, style='shelf', horizontal=0)
+        return
+
+    if isinstance(icon, list):
+        icon = icon[0]
+
+    # Make the button here
+    shelf_btn = cmds.shelfButton(
+        p=parent,
+        w=32, h=32,
+        label=label,
+        image1=icon,
+        command=cmd,
+        commandRepeatable=True,
+        sourceType=stp,
+        statusBarMessage=sbm
+    )
+
+    # If button has a menu item create it
+    if 'menuItem' in btn_data:
+        click_type = btn_data.get('menuItem-click-type', 'right').lower()
+        _create_shelf_popups(shelf_btn, click_type, btn_data.get('menuItem', []))
+
+
+def remove_shelf_button(shelf, button):
+    """
+    Deletes a button or all seperators from a shelf. If the button name
+    is 'seperaror' then all seperators will be removed from the shelf.
+    If 'ALL' is defined then all buttons will be deleted.
+    """
+    buttons = cmds.shelfLayout(shelf, q=True, childArray=True)
+    if buttons is None:
+        return
+
+    # Sets if this is operating in seperaror or button mode
+    seperator = button == 'separator'
+    ALL = button == 'ALL'
+
+    for btn in buttons:
+        if ALL:
+            cmds.deleteUI(btn)
+            continue
+        if seperator:
+            if cmds.objectTypeUI(btn, isType='separator'):
+                cmds.deleteUI(btn)
+        elif button == btn:
+            cmds.deleteUI(btn)
 
 
 class RowColumnWidget(QWidget):
@@ -146,6 +225,9 @@ class RowColumnWidget(QWidget):
             self._columns.append(layout)
 
         self.adjustSize()
+
+    def list(self):
+        return self._widgets
 
     def addWidget(self, widget: QWidget):
         self._widgets.append(widget)
@@ -181,6 +263,174 @@ class ToolButtonWidget(QPushButton):
         ''')
 
 
+class Installer:
+    """Simple Installer class to handle installing the tools."""
+
+    def __init__(self, shelf, tool_data, to_install, install_from: dict,
+                 scripts_path, icons_path, progress_bar, status_widget):
+        self.shelf = shelf
+        self._step = 0
+        self.tool_data = tool_data
+        self.to_install = to_install
+        self.scripts_path = scripts_path
+        self.icons_path = icons_path
+        self.progress_bar: QProgressBar = progress_bar
+        self.status_widget: QLabel = status_widget
+
+        self.scripts = []
+        self.modules = []
+        self.icons = []
+
+        self.install_scripts = scripts_path != 'Manually Install'
+
+        self.src_path: str = install_from['path']
+        self.is_local: bool = install_from['is_local']
+
+        self._file_pattern = re.compile('[\w.]+\.\w+$')
+
+        # Value ranges from 0 to 100
+        self.install_progress = 0
+        self.install_steps = 0
+
+    def update_progresss_bar(self):
+        progress = self.install_progress / self.install_steps
+        self.progress_bar.setValue(progress * 100)
+
+    def index_files(self, data: dict):
+        """
+        Looks at a diconary to find any scripts or icons that will need
+        to be installed.
+        """
+        if data is None:
+            return
+
+        def append(name: str, _plural=False) -> list:
+            # Return the data as a list from the given name if it exists.
+            nonlocal data
+            nonlocal self
+            ls = []
+            if name in data:
+                if isinstance(data[name], list):
+                    ls += data[name]
+                else:
+                    ls.append(data[name])
+            if not _plural:
+                ls += append(f'{name}s', True)
+            # Filter out anything that's not a file and then return result
+            return list(filter(lambda file: self._file_pattern.search(file), ls))
+
+        # All paths to look for and index
+        if self.install_scripts:
+            self.scripts += append('script')
+            self.modules += append('module')
+        self.icons += append('icon')
+
+        if 'buttons' in data and isinstance(data['buttons'], list):
+            for btn in data['buttons']:
+                self.index_files(btn)
+
+        # Deep indexing
+        for index in data:
+            if isinstance(data[index], dict):
+                self.index_files(data[index])
+                continue
+
+    def _async_copy(self, files, to, extra: str = '') -> list:
+        tasks = []
+
+        async def cop(src, dst):
+            nonlocal self
+            print(f'Copying <{src}> -> <{dst}>')
+
+            # Make directory if needed
+            if not os.path.exists(os.path.dirname(dst)):
+                os.makedirs(os.path.dirname(dst))
+
+            # Copy filre to new dest
+            shutil.copy(src, dst)
+
+            # Update progress bar
+            self.install_progress += 1
+            self.update_progresss_bar()
+
+        for file in files:
+            tasks.append(asyncio.create_task(cop(f'{self.src_path}/{extra}{file}', f'{to}/{file}')))
+        return tasks
+
+    def _async_download(self, files, to, extra: str = '') -> list:
+        tasks = []
+
+        async def cop(src, dst):
+            nonlocal self
+            print(f'Downloading <{src}> -> <{dst}>')
+            download_data(src, dst)
+            self.install_progress += 1
+            self.update_progresss_bar()
+
+        for file in files:
+            tasks.append(asyncio.create_task(cop(f'{_REPO}{extra}{file}', f'{to}/{file}')))
+        return tasks
+
+    async def _install_files(self, files, to, extra: str = ''):
+        """
+        Downloads/Copies all files for the selected tools into the respectivly
+        selected install directory.
+        """
+        tasks: list
+        if self.is_local:
+            tasks = self._async_copy(files, to, extra)
+        else:
+            tasks = self._async_download(files, to, extra)
+        await asyncio.gather(*tasks)
+        # self._async_download(files, to)
+        self.update_progresss_bar()
+
+    def _install_buttons(self):
+        """Installs all the buttons to the shelf."""
+        def index_buttons(t):
+            nonlocal self
+            for btn in t['buttons']:
+                create_shelf_button(self.shelf, btn)
+
+        for index in self.tool_data:
+            if index not in self.to_install:
+                continue
+            tool = self.tool_data[index]
+            if 'buttons' in tool:
+                index_buttons(tool)
+
+    def start(self):
+        """Start installing all selected tools"""
+        # Index all the files that need to be installed
+        for tool in self.tool_data:
+            if tool in self.to_install:
+                self.index_files(self.tool_data[tool])
+
+        print(f'Scripts: {self.scripts}')
+        print(f'Icons:   {self.icons}')
+        print(f'Modules: {self.modules}')
+
+        files = len(self.scripts) + len(self.icons) + len(self.modules)
+        self.install_steps = files
+
+        self.status_widget.setText('Downloading icons')
+        asyncio.run(
+            self._install_files(self.icons, self.icons_path, 'icons/')
+        )
+        if self.install_scripts:
+            self.status_widget.setText('Downloading scripts')
+            asyncio.run(
+                self._install_files(self.scripts, self.scripts_path)
+            )
+            self.status_widget.setText('Downloading modules')
+            asyncio.run(
+                self._install_files(self.modules, self.scripts_path)
+            )
+
+        self.status_widget.setText('Creating shelf buttons')
+        self._install_buttons()
+
+
 class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
     def __init__(self):
@@ -200,8 +450,8 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         self._toolbox_data: Optional[dict] = None  # all data from toolboxShelf.json
         self._tools_list_widget = RowColumnWidget(2)
         self._remote_data: Optional[dict] = None
-
-        self.splash = self._ui_install_progress_splash()
+        self._tools_install_status = {}
+        self._tasks = []
 
         # Build the UI
         self._build_ui()
@@ -301,8 +551,37 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
         return layout
 
-    def _ui_install_progress_splash(self) -> QLayout:
-        pass
+    def _ui_install_progress_splash(self) -> QWidget:
+        """Creates the UI for the installing splash screen."""
+        layout = QVBoxLayout()
+        widget = QWidget(layout=layout)
+
+        layout.addStretch()
+        layout.addWidget(QLabel('<h1>Cirkus Toolbox</h1>', alignment=Qt.AlignHCenter))
+        self._install_status = QLabel('Installing...', alignment=Qt.AlignHCenter)
+        layout.addWidget(self._install_status)
+
+        self._progress_widget = QProgressBar()
+        self._progress_widget.setValue(0)
+
+        widget.setStyleSheet('''
+        QProgressBar {
+            border: 0;
+            border-radius: 8px;
+            text-align: center;
+            height: 40px;
+        }
+        QProgressBar:chunk {
+            border-radius: 8px;
+            background: #709B64;
+        }
+        QProgressBar[error="true"]:chunk {background: #DC564C;}
+        ''')
+
+        layout.addWidget(self._progress_widget)
+        layout.addStretch()
+
+        return widget
 
     def _build_ui(self):
         """
@@ -329,16 +608,16 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         options_layout.setHorizontalSpacing(30)
 
         # Install Type
-        scripts_install_loc = QComboBox()
-        icons_install_loc = QComboBox()
-        shelf_name = QLineEdit(placeholderText='CoolTool')
+        self.scripts_install_loc = QComboBox()
+        self.icons_install_loc = QComboBox()
+        self.shelf_name = QLineEdit(placeholderText='CoolTool')
 
-        scripts_install_loc.addItem('Manually Install')
+        self.scripts_install_loc.addItem('Manually Install')
 
         # options_layout.addRow(QLabel('Install From'), self._install_from_options)
-        options_layout.addRow(QLabel('Scripts Path'), scripts_install_loc)
-        options_layout.addRow(QLabel('Icons Path'), icons_install_loc)
-        options_layout.addRow(QLabel('Shelf Name'), shelf_name)
+        options_layout.addRow(QLabel('Scripts Path'), self.scripts_install_loc)
+        options_layout.addRow(QLabel('Icons Path'), self.icons_install_loc)
+        options_layout.addRow(QLabel('Shelf Name'), self.shelf_name)
 
         # Add all the paths to the dropdown options.
         script_paths: list = os.getenv('MAYA_SCRIPT_PATH').split(';')
@@ -346,15 +625,18 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
         # Add all aviliable install paths in excluding system paths
         for path in filter(lambda x: '/Program' not in x and len(x) > 0, script_paths):
-            scripts_install_loc.addItem(path)
+            self.scripts_install_loc.addItem(path)
         for path in filter(lambda x: '/Program' not in x and len(x) > 0, icon_paths):
-            icons_install_loc.addItem(path)
+            self.icons_install_loc.addItem(path)
 
         # Main operation buttons
         buttons_layout = QHBoxLayout()
         buttons_layout.setContentsMargins(0, 20, 0, 0)
         cancel_btn = QPushButton('Cancel', objectName='cancel-btn', fixedHeight=50)
         self.install_btn = QPushButton('Install', objectName='install-btn', fixedHeight=50)
+
+        cancel_btn.clicked.connect(lambda: self.close())
+        self.install_btn.clicked.connect(lambda: self.install())
 
         buttons_layout.addWidget(self.install_btn)
         buttons_layout.addWidget(cancel_btn)
@@ -375,17 +657,82 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         layout.addWidget(self._tools_list_widget)
         layout.addStretch()
         layout.addLayout(buttons_layout)
-        self.setLayout(layout)
+
+        # Create base widgets to act as panels to switch between
+        self._install_splash = self._ui_install_progress_splash()
+        self._options_panel = QWidget(layout=layout)
+        self._install_splash.setVisible(False)
+
+        # Add the panels to a root layout
+        root_layout = QVBoxLayout()
+        root_layout.addWidget(self._options_panel)
+        root_layout.addWidget(self._install_splash)
+
+        self.setLayout(root_layout)
+
+    def set_panel(self, panel: str):
+        """
+        Sets the panel to either the main options panel or install splash.
+        If panel is set to install then the install panel will be shown
+        otherwise the main panel is displayed.
+        """
+        self._install_splash.setVisible('install' in panel)
+        self._options_panel.setVisible('install' not in panel)
+
+        if self._install_splash.isVisible():
+            self.setFixedHeight(200)
+        else:
+            self.setMaximumHeight(0)
+            self.setMinimumHeight(0)
 
     def install(self):
         """
         Runs the installer
         """
-        # TODO  If this is a local install check that the install path is valid before
-        #       continuting.
         # Handle invalid data to install from
         if self._toolbox_data is None:
             return
+
+        # Change Window to installing splash
+        self.set_panel('install')
+
+        # Create a shelf
+        shelf_name = self.shelf_name.text()
+        if shelf_name == '':
+            shelf_name = 'CoolTool'
+        create_shelf(shelf_name)
+        remove_shelf_button(shelf_name, 'ALL')
+
+        # Loop over all checked tools and install them
+        widgets = self._tools_list_widget.list()
+        tools_pending = []
+
+        w: ToolButtonWidget
+        for w in widgets:
+            if w.isChecked():
+                tools_pending.append(w.text())
+
+        try:
+            self._progress_widget.setProperty('error', False)
+            self._progress_widget.setStyleSheet('/*/')
+            # Create installer instance and start it
+            Installer(shelf_name, self._toolbox_data, tools_pending,
+                      {
+                          'is_local': self.is_local_install,
+                          'path': self._local_toolbox_dir
+                      },
+                      self.scripts_install_loc.currentText(),
+                      self.icons_install_loc.currentText(),
+                      self._progress_widget,
+                      self._install_status).start()
+        except Exception as e:
+            self._progress_widget.setProperty('error', True)
+            self._progress_widget.setStyleSheet('/*/')
+            self._install_status.setText('There was an error while installing.')
+            print('There was an error Installing the tools:', e)
+            print(traceback.format_exc())
+            return
+        self.close()
 
     def _load_tools(self, shelves: Optional[dict]):
         """
@@ -403,6 +750,13 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         # Update UI Elements
         for tool in shelves:
             widget = ToolButtonWidget(tool, parent=self)
+            tool_data = self._toolbox_data[tool]
+            widget.setChecked(True)
+            if 'checkStatus' in tool_data:
+                check_state = tool_data['checkStatus']
+                widget.setChecked(check_state)
+                if check_state == 2:
+                    widget.setDisabled(True)
             self._tools_list_widget.addWidget(widget)
 
     def _fetch_tools_data(self):
@@ -411,11 +765,17 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         locations depending on if it is being selected as a remote or local
         installiation.
         """
+        # Attempt to download remote data.
+        if self._remote_data is None:
+            from urllib.error import HTTPError
+            try:
+                shelf = download_data(f'{_REPO}toolboxShelf.json')
+                self._remote_data = json.loads(shelf)
+            except HTTPError:
+                cmds.warning('Failted to download remote data.')
+
         # Attempt to download the tool's data from the repo online.
         if not self.is_local_install:
-            if self._remote_data is None:
-                data = download_data(f'{_REPO}toolboxShelf.json')
-                self._remote_data = json.loads(data)
             self._load_tools(self._remote_data)
             return
 

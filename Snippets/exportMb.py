@@ -26,16 +26,16 @@ def makeRef(refName,publishString):
     backupName = ""
     
     #if file exists, increment and back it up
-    if os.path.isfile(pathName):
+    if os.src_path.isfile(pathName):
         #make backup folder
         backupFolder = '%s/%s/backup'%(parentFolder,currentFolder)
-        if not os.path.exists(backupFolder):
+        if not os.src_path.exists(backupFolder):
             os.makedirs(backupFolder)
         count = 1
-        backupExists = os.path.isfile('%s/%s%d'%(backupFolder,refFileName,count))
+        backupExists = os.src_path.isfile('%s/%s%d' % (backupFolder, refFileName, count))
         while (backupExists == 1):
             count += 1
-            backupExists = os.path.isfile('%s/%s%d'%(backupFolder,refFileName,count))
+            backupExists = os.src_path.isfile('%s/%s%d' % (backupFolder, refFileName, count))
         backupName = '%s/%s%d'%(backupFolder,refFileName,count)
         copyfile(pathName, backupName)
     #export .mb REF

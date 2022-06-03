@@ -9,7 +9,7 @@ def makeAlembic(refName, publishString):
             except: cmds.error('Could not load AbcExport plugin')
         #make folder
         modelFolder = '%scache/alembic/models'%(cmds.workspace(q=True,rd=True))
-        if not os.path.exists(modelFolder):
+        if not os.src_path.exists(modelFolder):
             os.makedirs(modelFolder)
         #export .abc
         command = '-frameRange 1 1 -attr material -attr alembicName -stripNamespaces -uvWrite -worldSpace -writeVisibility -writeUVSets -dataFormat ogawa -root %s -file models/%s.abc'%(publishString,refName)
