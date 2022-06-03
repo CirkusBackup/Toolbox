@@ -66,7 +66,7 @@
 						"label":"Remove MRay",
 						"command":"source clearPlugins;clearPlugins(4);"
 					}
-					
+
 				],
 				"stp":"mel"
 			},
@@ -98,7 +98,7 @@
 						"label":"RedshiftMaterial",
 						"command":"source assignNewShader;assignNewShader(\"RedshiftMaterial\");"
 					}
-					
+
 				]
 			},
 			{
@@ -245,7 +245,7 @@
 				"command":"source cacheYetiFur;cacheYetiFur;",
 				"stp":"mel"
 			},
-			{	
+			{
 				"icon": ["checkOutYeti.svg", "releaseYeti.svg"],
 				"label":"Check Out Yeti Licence",
 				"script": "mel/yetiLicenceActivation.mel",
@@ -406,7 +406,7 @@
 						"label":"green",
 						"command":"source playblastTemp;playblastTemp(4);"
 					}
-					
+
 				],
 				"stp":"mel"
 			},
@@ -447,7 +447,7 @@
 		},
 		"buttons": [
 			{
-				"icon":"installToolbox.svg",
+				"icon":"InstallIcon.svg",
 				"label":"install or update toolbox",
 				"script":"mel/installToolbox.mel",
 				"command":"source installToolbox;installToolbox;",
