@@ -1,168 +1,113 @@
-import maya.cmds as cmds
-import maya.mel as mel
+import asyncio
 import json
-import os
+import os.path
+import inspect
+import re
+import shutil
+import traceback
+
+from PySide2.QtCore import Qt
+from PySide2.QtWidgets import *
+from PySide2.QtGui import QIcon
+from maya import cmds
+from maya import mel
+from maya.OpenMayaUI import MQtUtil
+from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
+from shiboken2 import wrapInstance
 import urllib.request as request
-from collections import OrderedDict
+from typing import Optional
 
-# TODO add dependency handling for when the tool is being intsalled.
-# TODO Add option to install from local directory which will default to
-#      either, your Z://.. or if locally on a workstation from \\bigtop\job3...
+__version__ = '1.0.0'
 
-
-# Define constants
-_GITHUB_RAW = 'https://raw.githubusercontent.com/CirkusBackup/Toolbox/main/'
-
-
-def createShelf(shelfName):
-    shelfExists = False
-    sehlfs = cmds.layout('ShelfLayout', q=True, ca=True)
-    for shelf in sehlfs:
-        if shelf == shelfName:
-            shelfExists = True
-
-    if shelfExists:
-        print(f'Shelf {shelfName} exists.')
-    else:
-        print(f'Shelf {shelfName} does not exist. Creating new shelf.')
-        mel.eval(f'addNewShelfTab(\"{shelfName}\");')
+# Core constant's
+_REPO = 'https://raw.githubusercontent.com/CirkusBackup/Toolbox/Installer-v2/'
+W_OBJ = 'cirkusinstallerwindow'
+W_TITLE = 'Cirkus Toolbox Installer'
 
 
-def removeSeparator(shelfName, iconName):
-    createShelf(shelfName)
-    shelfButtons = cmds.shelfLayout(shelfName, q=True, childArray=True)
-
-    if shelfButtons:
-        for btn in shelfButtons:
-            label = ''
-
-            # Assert that this is a shelfButton
-            if cmds.objectTypeUI(btn, isType='separator'):
-                cmds.deleteUI(btn)
-
-
-def removeButton(shelfName, iconName):
-    shelfButtons = cmds.shelfLayout(shelfName, q=True, childArray=True)
-
-    if shelfButtons:
-        for btn in shelfButtons:
-            label = ''
-
-            # Assert that this is a shelfButton
-            if cmds.objectTypeUI(btn, isType='shelfButton'):
-
-                label = cmds.shelfButton(btn, q=True, label=True)
-
-                # If this button has the label we're looking for,
-                # delete the button.
-                if iconName == label:
-                    cmds.deleteUI(btn)
-
-
-def downloadFile(remote: str, local: str):
-    """'
-    Downloads a file from online somewhere into a local file.
+def _maya_main_window():
     """
-    file_path = local.rsplit('/', 1)
-
-    # Create the local dirs if not there
-    if len(file_path) > 1:
-        if not os.path.exists(f'{file_path[0]}'):
-            os.makedirs(file_path[0])
-
-    # Write the file to disk
-    with request.urlopen(remote) as req:
-        head = req.info()
-
-        total_size = int(head['Content-Length'])
-        block_size = 8192
-        cur_block = 0
-
-        print('')
-        print(f'Starting download of file {remote} ({total_size} bytes)...')
-
-        # Start downloading chunks
-        with open(local, 'wb') as file:
-            while True:
-                chunk = req.read(block_size)
-                if not chunk: break
-                file.write(chunk)
-                cur_block += 1
-                percent = int(cur_block * block_size * 100 / total_size)
-                if percent > 100:
-                    percent = 100
-                if percent >= 100:
-                    print(f'Done: {local}')
-                else:
-                    print(f'    {percent:.2f}%')
-
-
-def _local_scripts_path() -> str:
-    """Returns the local script's directory path"""
-    return f'{cmds.optionMenu("scriptsMenu", query=True, v=True)}'
-
-
-def _local_icons_path() -> str:
-    """Returns the local icon's directory path"""
-    return f'{cmds.optionMenu("iconsMenu", query=True, v=True)}'
-
-
-def install_dependencies(dependencies: dict):
+    Returns an instance of the main window for maya.
     """
-    Installs dependencies from the provided dictionary.
-    This accepts the following as string arrays in the dict:
-    - scripts
-    - icons
-    """
+    return wrapInstance(int(MQtUtil.mainWindow()), QMainWindow)
 
-    def _install(d, name, remote_path, local_path):
-        if name not in d:
-            return
-        data = d[name]
-        if isinstance(data, str):
-            downloadFile(
-                f'{remote_path}{data}',
-                f'{local_path}{data}'
-            )
+
+def _maya_delete_ui(window_title, window_object):
+    """
+    Clean up and delete matching windows.
+    """
+    if cmds.window(window_object, q=True, exists=True):
+        cmds.deleteUI(window_object)
+    if cmds.dockControl(f'MayaWindow|{window_title}', q=True, exists=True):
+        cmds.deleteUI(f'MayaWindow|{window_title}')
+
+
+def _maya_delete_workspace(window_object):
+    """
+    Clean up any matchign workspace controls
+    """
+    control = f'{window_object}WorkspaceControl'
+    if cmds.workspaceControl(control, q=True, exists=True):
+        cmds.workspaceControl(control, e=True, close=True)
+        cmds.deleteUI(control, control=True)
+
+
+def download_data(url: str, local: str = None) -> Optional[str]:
+    """
+    Downloads data from an url. If local is not defined or set to None
+    then it this will return the data in a string format otherwise
+    it will be written to file.
+
+    :url:    URL to where the data is being downloaded from.
+
+    :local:  Full path to the local file the data will be written into.
+             if this is empty then it will be returned,
+    """
+    data = None
+    to_file = local is not None
+
+    if to_file and not os.path.exists(os.path.dirname(local)):
+        os.makedirs(os.path.dirname(local))
+
+    def write_file(r, f):
+        while True:
+            block = r.read(8129)
+            if not block:
+                break
+            f.write(block)
+
+    def write_data(r):
+        nonlocal data
+        if data is None:
+            data = ''
+        while True:
+            block = r.read(8129)
+            if not block:
+                break
+            data += block.decode('utf-8')
+
+    with request.urlopen(url) as req:
+        if to_file:
+            with open(local, 'wb') as file:
+                write_file(req, file)
         else:
-            for file in data:
-                downloadFile(
-                    f'{remote_path}{file}',
-                    f'{local_path}{file}'
-                )
+            write_data(req)
 
-    _install(dependencies, 'scripts', f'{_GITHUB_RAW}', f'{_local_scripts_path()}/')
-    _install(dependencies, 'icons', f'{_GITHUB_RAW}icons/', f'{_local_icons_path()}/')
+    return data
 
 
-def checkGroups(shelfName):
-    # check that shelf exists
-    createShelf(shelfName)
+def _clean_up():
+    """Cleans up all instances of the installation window from maya."""
+    _maya_delete_ui(W_TITLE, W_OBJ)
+    _maya_delete_workspace(W_OBJ)
 
-    # read json
-    try:
-        JSONPath = cmds.textField('jsonPathText', q=True, text=True)
-        with open(JSONPath) as data_file:
-            data = json.load(data_file)
 
-        children = cmds.columnLayout('listLayout', q=True, ca=True)
-        allButtons = []
-        for c in children:
-
-            if cmds.checkBox(c, q=True, v=True):
-                cName = cmds.checkBox(c, q=True, l=True)
-                buttons = (data[cName]['buttons'])
-                allButtons += buttons
-
-            cmds.deleteUI(c)
-
-        # remove separators
-        removeSeparator(shelfName, 'separator')
-
-        addIcons(shelfName, allButtons)
-        cmds.deleteUI('Install Toolbox')
-    except Exception:
-        pass
+def create_shelf(name):
+    """Creates a new shelf if it does not already exist"""
+    exists = name in cmds.layout('ShelfLayout', q=True, ca=True)
+    if not exists:
+        print(f'Creating new shelf {name} to install the tools into.')
+        mel.eval(f'addNewShelfTab("{name}")')
 
 
 def _create_shelf_popups(parent: str, click_type: str, menus: list):
@@ -174,7 +119,6 @@ def _create_shelf_popups(parent: str, click_type: str, menus: list):
     if 'left' in click_type:
         popup = cmds.popupMenu(button=1, p=parent)
         for item in menus:
-            print(item)
             cmds.menuItem(
                 l=item.get('label', 'Unlabeled Item'),
                 d=item.get('divider', False),
@@ -192,255 +136,654 @@ def _create_shelf_popups(parent: str, click_type: str, menus: list):
         )
 
 
-def addIcons(shelfName, buttons):
-    localScriptsPath = cmds.optionMenu('scriptsMenu', query=True, v=True)
-    localIconsPath = cmds.optionMenu('iconsMenu', query=True, v=True)
-    scriptsMenuI = cmds.optionMenu('scriptsMenu', query=True, sl=True)
+def create_shelf_button(parent: str, btn_data: dict):
+    """
+    Creates a new shelf button from the given data.
+    """
+    label = btn_data.get('label', 'Undefined Button')
+    icon = btn_data.get('icon', 'commandButton.png')
+    cmd = btn_data.get('command', '')
+    stp = btn_data.get('stp', 'mel')
+    sbm = btn_data.get('sbm', '')
 
-    # resize progress bar
-    cmds.progressBar('progressControl', edit=True,
-                     vis=True, maxValue=len(buttons) - 1)
+    if icon == 'separator':
+        # Make it a seperator if it is one
+        cmds.separator(p=parent, style='shelf', horizontal=0)
+        return
 
-    # loop through dictionary
-    for i, name in enumerate(buttons):
-        btn: dict = buttons[i]
-        shelfString = 'cmds.shelfButton(rpt=True'
-        # download icons from github
-        try:
-            icon = buttons[i]['icon']
-            if isinstance(icon, str):
-                icon = [icon]
-            for ii, ico in enumerate(icon):
-                if ico == 'separator':
-                    print('seperator')
-                    shelfString = 'cmds.separator(style=\'shelf\',horizontal=0'
-                else:
-                    # try to download file
-                    downloadFile(f'{_GITHUB_RAW}icons/{ico}',
-                                 f'{localIconsPath}/{ico}')
-                    if ii == 0:
-                        shelfString += f',i1="{ico}"'
-        except Exception as e:
-            print('file not available')
-            print('Exception:', e)
-            # set icon to default button because image can not be downloaded
-            shelfString += ',i1=\'commandButton.png\''
-        # update progress
-        cmds.progressBar('progressControl', edit=True, step=1)
+    if isinstance(icon, list):
+        icon = icon[0]
 
-        if 'dependencies' in btn:
-            install_dependencies(btn['dependencies'])
-
-        # download script from github
-        if scriptsMenuI > 1:
-            try:
-                script = buttons[i]['script']
-
-                downloadFile(f'{_GITHUB_RAW}{script}',
-                             f'{localScriptsPath}/{script}')
-            except Exception:
-                print('file not available')
-
-        # download modules from github
-        if scriptsMenuI > 1:
-            try:
-                modules = buttons[i]['modules']
-                for mod in modules:
-                    downloadFile(f'{_GITHUB_RAW}{mod}',
-                                 f'{localScriptsPath}/{mod}')
-            except Exception:
-                print('file not available')
-        try:
-            label = buttons[i]['label']
-            shelfString += f',l=\'{label}\''
-        except Exception:
-            label = ''
-        try:
-            com = buttons[i]['command']
-            shelfString += f',c=\'{com}\''
-        except Exception:
-            com = ''
-        try:
-            stp = buttons[i]['stp']
-            shelfString += f',stp=\'{stp}\''
-        except Exception:
-            # shelfString += ',stp=\'mel\''
-            print('using mel')
-
-        shelfString += ',w=32,h=32,p=\'' + shelfName + '\')'
-
-        # remove old button
-        if label:
-            removeButton(shelfName, label)
-
-        # add icons to shelf
-        shelf_btn = eval(shelfString)
-
-        # Create a dropdown menu
-        if 'menuItem' in btn:
-            click_type = btn.get('menuItem-click-type', 'right').lower()
-            _create_shelf_popups(shelf_btn, click_type, btn.get('menuItem', []))
-
-
-def CheckText():
-    shelfName = cmds.textField('nameText', q=True, text=True)
-    checkGroups(shelfName)
-
-
-def filterOutSystemPaths(path):
-    systemPath = 0
-    if path[0] == '/':
-        systemPath = 1
-    allparts = path.split('/')
-    for part in allparts:
-        if part == 'ProgramData' or part == 'Program Files':
-            systemPath = 1
-
-    return systemPath
-
-
-def browseForFile():
-    filename = cmds.fileDialog2(fileMode=1, caption="Import Image")
-    print(filename)
-    cmds.textField('jsonPathText', e=True, tx=filename[0])
-    updateGrpCheckboxes()
-    # return filename
-
-
-def updateGrpCheckboxes():
-    try:
-        children = cmds.columnLayout('listLayout', q=True, ca=True)
-        for c in children:
-            cmds.deleteUI(c)
-    except Exception:
-        pass
-
-    JSONPath = cmds.textField('jsonPathText', q=True, tx=True)
-
-    try:
-        data = json.load(open(JSONPath), object_pairs_hook=OrderedDict)
-        cmds.textField('jsonPathText', e=True, text=JSONPath)
-        cmds.setParent('listLayout')
-        for k in data:
-            cb = cmds.checkBox(h=20, label=k, v=1)
-            try:
-                if data[k]["checkStatus"] == 0:
-                    cmds.checkBox(cb, e=True, v=0)
-                if data[k]["checkStatus"] == 2:
-                    cmds.checkBox(cb, e=True, v=1, ed=0)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-
-def installToolboxWindow():
-    installForm = cmds.formLayout()
-    textLabel = cmds.text(label='Shelf')
-    nameText = cmds.textField('nameText', width=200, tx='CoolTool')
-    scriptsMenu = cmds.optionMenu('scriptsMenu')
-    jsonPathText = cmds.textField('jsonPathText', ed=False, pht='path to json')
-    jsonPathBtn = cmds.button('jsonPathBtn', width=50,
-                              label='...', c='browseForFile()')
-    separator = ';' if cmds.about(nt=True) else ':'
-    scriptsPaths = os.getenv('MAYA_SCRIPT_PATH')
-    allparts = scriptsPaths.split(separator)
-    for i, part in enumerate(allparts):
-        if i == 0:
-            cmds.menuItem(label='Manually install scripts')
-        if i < 7:
-            isSystemPath = filterOutSystemPaths(part)
-            if isSystemPath == 0:
-                cmds.menuItem(label=part)
-
-    iconsMenu = cmds.optionMenu('iconsMenu')
-    iconsPaths = os.getenv('XBMLANGPATH')
-    iconsParts = iconsPaths.split(separator)
-
-    for i, part in enumerate(iconsParts):
-        if i < 6:
-            isSystemPath = filterOutSystemPaths(part)
-            if isSystemPath == 0:
-                cmds.menuItem(label=part)
-
-    progressControl = cmds.progressBar(
-        'progressControl', maxValue=10, vis=False, width=250)
-
-    btn1 = cmds.button(height=50, label='Install', c='CheckText()')
-    btn2 = cmds.button(height=50, label='Close',
-                       c='cmds.deleteUI(\'Install Toolbox\')')
-
-    listLayout = cmds.columnLayout('listLayout', adjustableColumn=True)
-
-    try:
-        dirname = os.path.dirname(__file__)
-    except Exception:
-        print('running in test environment')
-        dirname = 'C:/Users/Admin/Documents/Toolbox'
-
-    JSONPath = f'{dirname}/toolboxShelf.json'
-
-    try:
-        data = json.load(open(JSONPath), object_pairs_hook=OrderedDict)
-        cmds.textField('jsonPathText', e=True, text=JSONPath)
-        for k in data:
-            cb = cmds.checkBox(h=20, label=k, v=1)
-            try:
-                if data[k]["checkStatus"] == 0:
-                    cmds.checkBox(cb, e=True, v=0)
-                if data[k]["checkStatus"] == 2:
-                    cmds.checkBox(cb, e=True, v=1, ed=0)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    # Layout elements
-    cmds.formLayout(
-        installForm, edit=True,
-        attachForm= [
-            (textLabel, 'top', 15),
-            (textLabel, 'left', 10),
-            (nameText, 'top', 10),
-            (nameText, 'right', 10),
-            (scriptsMenu, 'right', 10),
-            (iconsMenu, 'right', 10),
-            (jsonPathBtn, 'right', 10),
-            (progressControl, 'left', 10),
-            (progressControl, 'right', 10),
-            (btn1, 'bottom', 0),
-            (btn1, 'left', 0),
-            (btn2, 'bottom', 0),
-            (btn2, 'right', 0)
-        ],
-        attachControl= [
-            (nameText, 'left', 10, textLabel),
-            (scriptsMenu, 'top', 10, textLabel),
-            (scriptsMenu, 'left', 10, textLabel),
-            (iconsMenu, 'top', 10, scriptsMenu),
-            (iconsMenu, 'left', 10, textLabel),
-            (jsonPathText, 'top', 10, iconsMenu),
-            (jsonPathBtn, 'top', 10, iconsMenu),
-            (jsonPathText, 'left', 10, textLabel),
-            (jsonPathText, 'right', 10, jsonPathBtn),
-            (progressControl, 'top', 20, jsonPathText),
-            (progressControl, 'left', 10, textLabel),
-            (listLayout, 'top', 20, jsonPathText),
-            (listLayout, 'left', 10, textLabel),
-            (btn2, 'left', 0, btn1)
-        ],
-        attachPosition=[
-            (btn1, 'right', 0, 50)
-        ]
+    # Make the button here
+    shelf_btn = cmds.shelfButton(
+        p=parent,
+        w=32, h=32,
+        label=label,
+        image1=icon,
+        command=cmd,
+        commandRepeatable=True,
+        sourceType=stp,
+        statusBarMessage=sbm
     )
 
-
-def toolbox_install():
-    workspaceName = 'Install Toolbox'
-    if cmds.workspaceControl('Install Toolbox', exists=True):
-        cmds.deleteUI('Install Toolbox')
-    cmds.workspaceControl(workspaceName, initialHeight=250,
-                          initialWidth=200, uiScript='installToolboxWindow()')
+    # If button has a menu item create it
+    if 'menuItem' in btn_data:
+        click_type = btn_data.get('menuItem-click-type', 'right').lower()
+        _create_shelf_popups(shelf_btn, click_type, btn_data.get('menuItem', []))
 
 
-toolbox_install()
+def remove_shelf_button(shelf, button):
+    """
+    Deletes a button or all seperators from a shelf. If the button name
+    is 'seperaror' then all seperators will be removed from the shelf.
+    If 'ALL' is defined then all buttons will be deleted.
+    """
+    buttons = cmds.shelfLayout(shelf, q=True, childArray=True)
+    if buttons is None:
+        return
+
+    # Sets if this is operating in seperaror or button mode
+    seperator = button == 'separator'
+    ALL = button == 'ALL'
+
+    for btn in buttons:
+        if ALL:
+            cmds.deleteUI(btn)
+            continue
+        if seperator:
+            if cmds.objectTypeUI(btn, isType='separator'):
+                cmds.deleteUI(btn)
+        elif button == btn:
+            cmds.deleteUI(btn)
+
+
+class RowColumnWidget(QWidget):
+    """Simple widget to build a set of rows and columns"""
+
+    def __init__(self, columns: int = 2):
+        super(RowColumnWidget, self).__init__()
+
+        # Have a min value of 1
+        if columns < 1:
+            columns = 1
+
+        self.columns = columns
+        self._widgets = []
+        self._columns = []
+
+        self._layout = QHBoxLayout()
+        self.setLayout(self._layout)
+
+        for i in range(columns):
+            layout_base = QVBoxLayout()
+            layout = QVBoxLayout()
+            layout_base.addLayout(layout)
+            layout_base.addStretch()
+            self._layout.addLayout(layout_base)
+            self._columns.append(layout)
+
+        self.adjustSize()
+
+    def list(self):
+        return self._widgets
+
+    def addWidget(self, widget: QWidget):
+        self._widgets.append(widget)
+        col = self.columns - 1 - len(self._widgets) % self.columns
+        self._columns[col].addWidget(widget)
+
+    def reset(self):
+        widget: QWidget
+        for widget in self._widgets:
+            widget.deleteLater()
+            widget.setParent(None)
+        self._widgets.clear()
+
+
+class ToolButtonWidget(QPushButton):
+
+    def __init__(self, *args, **kwargs):
+        super(ToolButtonWidget, self).__init__(*args, **kwargs)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setCheckable(True)
+
+        self.setStyleSheet('''
+        ToolButtonWidget {
+            background: transparent;
+            border: 3px solid #5D5D5D;
+            padding-top: 7px;
+            padding-bottom: 7px;
+            border-radius: 8px;
+        }
+        ToolButtonWidget:checked {
+            border-color: #709B64;
+        }
+        ''')
+
+
+class Installer:
+    """Simple Installer class to handle installing the tools."""
+
+    def __init__(self, shelf, tool_data, to_install, install_from: dict,
+                 scripts_path, icons_path, progress_bar, status_widget):
+        self.shelf = shelf
+        self._step = 0
+        self.tool_data = tool_data
+        self.to_install = to_install
+        self.scripts_path = scripts_path
+        self.icons_path = icons_path
+        self.progress_bar: QProgressBar = progress_bar
+        self.status_widget: QLabel = status_widget
+
+        self.scripts = []
+        self.modules = []
+        self.icons = []
+
+        self.install_scripts = scripts_path != 'Manually Install'
+
+        self.src_path: str = install_from['path']
+        self.is_local: bool = install_from['is_local']
+
+        self._file_pattern = re.compile('[\\w.]+\\.\\w+$')
+
+        # Value ranges from 0 to 100
+        self.install_progress = 0
+        self.install_steps = 0
+
+    def update_progresss_bar(self):
+        progress = self.install_progress / self.install_steps
+        self.progress_bar.setValue(progress * 100)
+
+    def index_files(self, data: dict):
+        """
+        Looks at a diconary to find any scripts or icons that will need
+        to be installed.
+        """
+        if data is None:
+            return
+
+        def append(name: str, _plural=False) -> list:
+            # Return the data as a list from the given name if it exists.
+            nonlocal data
+            nonlocal self
+            ls = []
+            if name in data:
+                if isinstance(data[name], list):
+                    ls += data[name]
+                else:
+                    ls.append(data[name])
+            if not _plural:
+                ls += append(f'{name}s', True)
+            # Filter out anything that's not a file and then return result
+            return list(filter(lambda file: self._file_pattern.search(file), ls))
+
+        # All paths to look for and index
+        if self.install_scripts:
+            self.scripts += append('script')
+            self.modules += append('module')
+        self.icons += append('icon')
+
+        if 'buttons' in data and isinstance(data['buttons'], list):
+            for btn in data['buttons']:
+                self.index_files(btn)
+
+        # Deep indexing
+        for index in data:
+            if isinstance(data[index], dict):
+                self.index_files(data[index])
+                continue
+
+    def _async_copy(self, files, to, extra: str = '') -> list:
+        tasks = []
+
+        async def cop(src, dst):
+            nonlocal self
+            print(f'Copying {self._file_pattern.search(src)[0]} -> <{dst}>')
+
+            # Make directory if needed
+            if not os.path.exists(os.path.dirname(dst)):
+                os.makedirs(os.path.dirname(dst))
+
+            # Copy filre to new dest
+            shutil.copy(src, dst)
+
+            # Update progress bar
+            self.install_progress += 1
+            self.update_progresss_bar()
+
+        for file in files:
+            tasks.append(asyncio.create_task(cop(f'{self.src_path}/{extra}{file}', f'{to}/{file}')))
+        return tasks
+
+    def _async_download(self, files, to, extra: str = '') -> list:
+        tasks = []
+
+        async def cop(src, dst):
+            nonlocal self
+            print(f'Downloading {self._file_pattern.search(src)[0]} -> <{dst}>')
+            download_data(src, dst)
+            self.install_progress += 1
+            self.update_progresss_bar()
+
+        for file in files:
+            tasks.append(asyncio.create_task(cop(f'{_REPO}{extra}{file}', f'{to}/{file}')))
+        return tasks
+
+    async def _install_files(self, files, to, extra: str = ''):
+        """
+        Downloads/Copies all files for the selected tools into the respectivly
+        selected install directory.
+        """
+        tasks: list
+        if self.is_local:
+            tasks = self._async_copy(files, to, extra)
+        else:
+            tasks = self._async_download(files, to, extra)
+        await asyncio.gather(*tasks)
+        # self._async_download(files, to)
+        self.update_progresss_bar()
+
+    def _install_buttons(self):
+        """Installs all the buttons to the shelf."""
+        def index_buttons(t):
+            nonlocal self
+            for btn in t['buttons']:
+                create_shelf_button(self.shelf, btn)
+
+        for index in self.tool_data:
+            if index not in self.to_install:
+                continue
+            tool = self.tool_data[index]
+            if 'buttons' in tool:
+                index_buttons(tool)
+
+    def start(self):
+        """Start installing all selected tools"""
+        # Index all the files that need to be installed
+        for tool in self.tool_data:
+            if tool in self.to_install:
+                self.index_files(self.tool_data[tool])
+
+        files = len(self.scripts) + len(self.icons) + len(self.modules)
+        self.install_steps = files
+
+        self.status_widget.setText('Downloading icons')
+        asyncio.run(
+            self._install_files(self.icons, self.icons_path, 'icons/')
+        )
+        if self.install_scripts:
+            self.status_widget.setText('Downloading scripts')
+            asyncio.run(
+                self._install_files(self.scripts, self.scripts_path)
+            )
+            self.status_widget.setText('Downloading modules')
+            asyncio.run(
+                self._install_files(self.modules, self.scripts_path)
+            )
+
+        self.status_widget.setText('Creating shelf buttons')
+        self._install_buttons()
+
+
+class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
+
+    def __init__(self):
+        _clean_up()
+        super(InstallerWindow, self).__init__(_maya_main_window())
+
+        # Setup base window properties
+        self.setObjectName(W_OBJ)
+        self.setWindowTitle(W_TITLE)
+        self.setWindowFlags(Qt.Window)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        # self.setFixedWidth(400)
+        # self.setMaximumWidth(700)
+
+        # Define base vars
+        self._local_toolbox_dir: Optional[str] = None  # local install dir
+        self._toolbox_data: Optional[dict] = None  # all data from toolboxShelf.json
+        self._tools_list_widget = RowColumnWidget(2)
+        self._remote_data: Optional[dict] = None
+        self._tools_install_status = {}
+        self._tasks = []
+
+        # Build the UI
+        self._build_ui()
+        self._check_install_state()
+
+    @property
+    def is_local_install(self) -> bool:
+        return self._install_from_options.currentIndex()
+
+    def _check_install_state(self):
+        """
+        Sets the state of the install button to be enabled or disabled
+        depending on if all parameters are valid. This will also update
+        the listed tools in the UI to match if it is sourcing from either
+        remote or local paths.
+        """
+        self._fetch_tools_data()
+        if self.is_local_install:
+            if self._local_toolbox_dir is None:
+                self.install_btn.setEnabled(False)
+                self._load_tools(None)
+                return
+        self._load_tools(self._remote_data)
+        self.install_btn.setEnabled(True)
+
+    def _select_install_dir(self):
+        """
+        Opens a dialog to select the directory where the Cirkus Toolbox tools are located.
+        If the directory does not have the required files to install the tools from then
+        a warning will be shown and not be set.
+        """
+        responce = QFileDialog.getExistingDirectory(
+            parent=self,
+            caption='Select install directory',
+            directory=os.getcwd()
+        )
+
+        # ignore cancels
+        if responce is None or len(responce) == 0:
+            return
+
+        # Check if the required files are in the directory to install with
+        files = os.listdir(responce)
+        if 'toolboxShelf.json' not in files:
+            cmds.warning('Invalid Install Directory. This does not contain the required data to install the Cirkus '
+                         'Toolbox with.')
+            self._check_install_state()
+            self._load_tools(None)
+            return
+
+        # Update internal vars and UI
+        self._local_toolbox_dir = responce
+        self._install_local_text.setText(responce)
+        self._check_install_state()
+        self._fetch_tools_data()
+
+    def _ui_install_build(self) -> QLayout:
+        """
+        Builds UI elements to handle the options of switching between a remote
+        or local installation.
+        """
+        layout = QFormLayout()
+        layout.setContentsMargins(30, 30, 30, 0)
+        layout.setHorizontalSpacing(30)
+
+        content_layout = QHBoxLayout()
+
+        # Install Type
+        self._install_from_options = QComboBox()
+        self._install_from_options.addItems(['Remote Install', 'Local Install'])
+
+        local_layout = QHBoxLayout()
+        local_widget = QWidget(layout=local_layout, visible=self._install_from_options.currentIndex())
+        open_search_btn = QPushButton(icon=QIcon(':/folder-open.png'))
+        self._install_local_text = QLineEdit(disabled=True)
+        local_layout.addWidget(self._install_local_text)
+        local_layout.addWidget(open_search_btn)
+
+        local_layout.setContentsMargins(0, 0, 0, 0)
+
+        local_dir = inspect.getfile(lambda: None)
+        if '<maya console>' in local_dir:
+            local_dir = ''
+        self._install_local_text.setText(local_dir)
+
+        content_layout.addWidget(self._install_from_options)
+        content_layout.addWidget(local_widget)
+
+        layout.addRow(QLabel('Install From'), content_layout)
+        # layout.addRow(QLabel(''), local_widget)
+
+        # Make Connections
+        self._install_from_options.currentIndexChanged.connect(lambda x: (
+            local_widget.setVisible(x), self._check_install_state()
+        ))
+        open_search_btn.clicked.connect(lambda x: self._select_install_dir())
+
+        return layout
+
+    def _ui_install_progress_splash(self) -> QWidget:
+        """Creates the UI for the installing splash screen."""
+        layout = QVBoxLayout()
+        widget = QWidget(layout=layout)
+
+        layout.addStretch()
+        layout.addWidget(QLabel('<h1>Cirkus Toolbox</h1>', alignment=Qt.AlignHCenter))
+        self._install_status = QLabel('Installing...', alignment=Qt.AlignHCenter)
+        layout.addWidget(self._install_status)
+
+        self._progress_widget = QProgressBar()
+        self._progress_widget.setValue(0)
+
+        widget.setStyleSheet('''
+        QProgressBar {
+            border: 0;
+            border-radius: 8px;
+            text-align: center;
+            height: 40px;
+        }
+        QProgressBar:chunk {
+            border-radius: 8px;
+            background: #709B64;
+        }
+        QProgressBar[error="true"]:chunk {background: #DC564C;}
+        ''')
+
+        layout.addWidget(self._progress_widget)
+        layout.addStretch()
+
+        return widget
+
+    def _build_ui(self):
+        """
+        Builds the UI for the installer window.
+        """
+        layout = QVBoxLayout()
+
+        # Some simple styling
+        self.setStyleSheet('''
+        QComboBox { padding: 5px 10px; } 
+        #install-btn { background: #709B64; border-radius: 8px; }
+        #install-btn:hover { background: #97C989; }
+        #install-btn:pressed { background: #3F5838; }
+        #install-btn:disabled { background: #5E7059; }
+        #cancel-btn { background: #5D5D5D; border-radius: 8px; }
+        #cancel-btn:hover { background: #787878; }
+        #cancel-btn:pressed { background: #2B2B2B; }
+        ''')
+
+        # Install options
+        options_layout = QFormLayout()
+        options_layout.setContentsMargins(30, 0, 30, 30)
+        options_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        options_layout.setHorizontalSpacing(30)
+
+        # Install Type
+        self.scripts_install_loc = QComboBox()
+        self.icons_install_loc = QComboBox()
+        self.shelf_name = QLineEdit(placeholderText='CoolTool')
+
+        self.scripts_install_loc.addItem('Manually Install')
+
+        # options_layout.addRow(QLabel('Install From'), self._install_from_options)
+        options_layout.addRow(QLabel('Scripts Path'), self.scripts_install_loc)
+        options_layout.addRow(QLabel('Icons Path'), self.icons_install_loc)
+        options_layout.addRow(QLabel('Shelf Name'), self.shelf_name)
+
+        # Add all the paths to the dropdown options.
+        script_paths: list = os.getenv('MAYA_SCRIPT_PATH').split(';')
+        icon_paths: list = os.getenv('XBMLANGPATH').split(';')
+
+        # Add all aviliable install paths in excluding system paths
+        for path in filter(lambda x: '/Program' not in x and len(x) > 0, script_paths):
+            self.scripts_install_loc.addItem(path)
+        for path in filter(lambda x: '/Program' not in x and len(x) > 0, icon_paths):
+            self.icons_install_loc.addItem(path)
+
+        # Main operation buttons
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 20, 0, 0)
+        cancel_btn = QPushButton('Cancel', objectName='cancel-btn', fixedHeight=50)
+        self.install_btn = QPushButton('Install', objectName='install-btn', fixedHeight=50)
+
+        cancel_btn.clicked.connect(lambda: self.close())
+        self.install_btn.clicked.connect(lambda: self.install())
+
+        buttons_layout.addWidget(self.install_btn)
+        buttons_layout.addWidget(cancel_btn)
+
+        # Create heading layout and labels
+        heading = QVBoxLayout(alignment=Qt.AlignHCenter)
+        heading.addWidget(QLabel('<h1>Cirkus Toolbox</h1>', alignment=Qt.AlignHCenter))
+        heading.addWidget(QLabel('Select what tools you want to install and where they should be installed.'
+                                 'All the available paths are defined as maya environment paths.',
+                                 wordWrap=True, fixedHeight=50, fixedWidth=290, alignment=Qt.AlignTop))
+
+        # Add all the layouts and set it to the widget
+        layout.addLayout(heading)
+        layout.addLayout(self._ui_install_build())
+        layout.addLayout(options_layout)
+        layout.addWidget(QLabel('<h3 align="center">Available Tools to Install</h3>'))
+        # layout.addLayout(modules_layout)
+        layout.addWidget(self._tools_list_widget)
+        layout.addStretch()
+        layout.addLayout(buttons_layout)
+
+        # Create base widgets to act as panels to switch between
+        self._install_splash = self._ui_install_progress_splash()
+        self._options_panel = QWidget(layout=layout)
+        self._install_splash.setVisible(False)
+
+        # Add the panels to a root layout
+        root_layout = QVBoxLayout()
+        root_layout.addWidget(self._options_panel)
+        root_layout.addWidget(self._install_splash)
+
+        self.setLayout(root_layout)
+
+    def set_panel(self, panel: str):
+        """
+        Sets the panel to either the main options panel or install splash.
+        If panel is set to install then the install panel will be shown
+        otherwise the main panel is displayed.
+        """
+        self._install_splash.setVisible('install' in panel)
+        self._options_panel.setVisible('install' not in panel)
+
+        if self._install_splash.isVisible():
+            self.setFixedHeight(200)
+        else:
+            self.setMaximumHeight(0)
+            self.setMinimumHeight(0)
+
+    def install(self):
+        """
+        Runs the installer
+        """
+        # Handle invalid data to install from
+        if self._toolbox_data is None:
+            return
+
+        # Change Window to installing splash
+        self.set_panel('install')
+
+        # Create a shelf
+        shelf_name = self.shelf_name.text()
+        if shelf_name == '':
+            shelf_name = 'CoolTool'
+        create_shelf(shelf_name)
+        remove_shelf_button(shelf_name, 'ALL')
+
+        # Loop over all checked tools and install them
+        widgets = self._tools_list_widget.list()
+        tools_pending = []
+
+        w: ToolButtonWidget
+        for w in widgets:
+            if w.isChecked():
+                tools_pending.append(w.text())
+
+        try:
+            self._progress_widget.setProperty('error', False)
+            self._progress_widget.setStyleSheet('/*/')
+            # Create installer instance and start it
+            Installer(shelf_name, self._toolbox_data, tools_pending,
+                      {
+                          'is_local': self.is_local_install,
+                          'path': self._local_toolbox_dir
+                      },
+                      self.scripts_install_loc.currentText(),
+                      self.icons_install_loc.currentText(),
+                      self._progress_widget,
+                      self._install_status).start()
+        except Exception as e:
+            self._progress_widget.setProperty('error', True)
+            self._progress_widget.setStyleSheet('/*/')
+            self._install_status.setText('There was an error while installing.')
+            print('There was an error Installing the tools:', e)
+            print(traceback.format_exc())
+            return
+        self.close()
+
+    def _load_tools(self, shelves: Optional[dict]):
+        """
+        Loads all the tools into memory and updates the UI elements to reflect all
+        the aviliable tools that can be installed.
+        """
+        self._toolbox_data = shelves
+
+        # Remove all old widgets from list
+        self._tools_list_widget.reset()
+
+        if shelves is None:
+            return
+
+        # Update UI Elements
+        for tool in shelves:
+            widget = ToolButtonWidget(tool, parent=self)
+            tool_data = self._toolbox_data[tool]
+            widget.setChecked(True)
+            if 'checkStatus' in tool_data:
+                check_state = tool_data['checkStatus']
+                widget.setChecked(check_state)
+                if check_state == 2:
+                    widget.setDisabled(True)
+            self._tools_list_widget.addWidget(widget)
+
+    def _fetch_tools_data(self):
+        """
+        Fetches the data for the installer. This will check in multiple
+        locations depending on if it is being selected as a remote or local
+        installiation.
+        """
+        # Attempt to download remote data.
+        if self._remote_data is None:
+            from urllib.error import HTTPError
+            try:
+                shelf = download_data(f'{_REPO}toolboxShelf.json')
+                self._remote_data = json.loads(shelf)
+            except HTTPError:
+                cmds.warning('Failted to download remote data.')
+
+        # Attempt to download the tool's data from the repo online.
+        if not self.is_local_install:
+            self._load_tools(self._remote_data)
+            return
+
+        # Load from file
+        if self._local_toolbox_dir is not None:
+            file = os.path.join(self._local_toolbox_dir, 'toolboxShelf.json')
+            with open(file, 'r') as content:
+                self._load_tools(json.loads(content.read()))
+
+
+def open_window():
+    installer = InstallerWindow()
+    installer.show()
+
+
+if __name__ == '__main__':
+    open_window()

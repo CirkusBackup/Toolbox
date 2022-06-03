@@ -363,8 +363,9 @@
 	},
 	"Admin":{
 		"checkStatus":0,
-		"dependencies":[
-		],
+		"dependencies": {
+			"scripts": ["baseIO/loadSave.py", "baseIO/qtBase.py"]
+		},
 		"buttons": [
 			{
 				"icon":"lm_projectWindow.svg",
@@ -441,8 +442,9 @@
 	},
 	"Updates":{
 		"checkStatus":2,
-		"dependencies":[
-		],
+		"dependencies":{
+			"scripts": ["installToolbox.py"]
+		},
 		"buttons": [
 			{
 				"icon":"installToolbox.svg",
