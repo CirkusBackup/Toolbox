@@ -479,6 +479,7 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
             # be much faster to update from then downloading.
             self._install_local_text.setText(path)
             self._install_from_options.setCurrentIndex(1)
+            self._fetch_tools_data()
             return
 
         # Set text to empty if not on a network drive
@@ -513,10 +514,13 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         If the directory does not have the required files to install the tools from then
         a warning will be shown and not be set.
         """
+        default_dir = os.getcwd()
+        if self._install_local_text.text() != '':
+            default_dir = self._install_local_text.text()
         responce = QFileDialog.getExistingDirectory(
             parent=self,
             caption='Select install directory',
-            directory=os.getcwd()
+            directory=default_dir
         )
 
         # ignore cancels
