@@ -5,6 +5,7 @@ import inspect
 import re
 import shutil
 import traceback
+import urllib.request
 
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import *
@@ -21,6 +22,7 @@ __version__ = '1.0.0'
 
 # Core constant's
 _REPO = 'https://raw.githubusercontent.com/CirkusBackup/Toolbox/Installer-v2/'
+_NETWORK_ROOT = '\\\\bigtop/bigtop'
 W_OBJ = 'cirkusinstallerwindow'
 W_TITLE = 'Cirkus Toolbox Installer'
 
@@ -450,6 +452,40 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         # Build the UI
         self._build_ui()
         self._check_install_state()
+        self._find_local_install()
+
+    def _find_local_install(self):
+        """
+        Attempt to find the local install directory for the toolbox and prefill
+        the input. If the nothing can be found then the input will remain empty.
+        """
+        if os.path.exists(_NETWORK_ROOT):
+            # Bring run from a workstation in Cirkus. Go direrectly to the local
+            # path for tools.
+            path = f'{_NETWORK_ROOT}/Job_3/System/Deployment/Toolbox'
+            toolbox_shelf_file = 'toolboxShelf.json'
+
+            if not os.path.exists(path):
+                cmds.warning(f'Cannot find local toolbox install: Has the Toolbox been moved from "{path}"?')
+                return
+
+            files_in = os.listdir(path)
+            if toolbox_shelf_file not in files_in:
+                cmds.warning(f'Missing toolboxShelf.json from {path}')
+                return
+
+            # Set network updates to be done locally by default. This is
+            # only set as a default as it's likely these files be up-to-date and
+            # be much faster to update from then downloading.
+            self._install_local_text.setText(path)
+            self._install_from_options.setCurrentIndex(1)
+            return
+
+        # Set text to empty if not on a network drive
+        self._install_local_text.setText('')
+
+
+
 
     @property
     def is_local_install(self) -> bool:
@@ -525,11 +561,6 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
         local_layout.addWidget(open_search_btn)
 
         local_layout.setContentsMargins(0, 0, 0, 0)
-
-        local_dir = inspect.getfile(lambda: None)
-        if '<maya console>' in local_dir:
-            local_dir = ''
-        self._install_local_text.setText(local_dir)
 
         content_layout.addWidget(self._install_from_options)
         content_layout.addWidget(local_widget)
