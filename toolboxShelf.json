@@ -234,9 +234,9 @@
 		]
 	},
 	"Yeti":{
-		"dependencies":[
-
-		],
+		"dependencies": {
+			"scripts": ["mel/yetiLicenceActivation.mel"]
+		},
 		"buttons": [
 			{
 				"icon":"cacheYetiFur.svg",
@@ -319,7 +319,7 @@
 	},
 	"Redshift":{
 		"dependencies": {
-			"scripts": ["RSPluginCheck.mel"]
+			"scripts": ["RSEnablePlugin.mel"]
 		},
 		"buttons": [
 			{
@@ -361,8 +361,8 @@
 			}
 		]
 	},
-	"Admin":{
-		"checkStatus":0,
+	"Project":{
+		"checkStatus":1,
 		"dependencies": {
 			"scripts": ["baseIO/loadSave.py", "baseIO/qtBase.py"]
 		},

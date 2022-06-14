@@ -25,6 +25,7 @@ _REPO = 'https://raw.githubusercontent.com/CirkusBackup/Toolbox/Installer-v2/'
 _NETWORK_ROOT = '\\\\bigtop/bigtop'
 W_OBJ = 'cirkusinstallerwindow'
 W_TITLE = 'Cirkus Toolbox Installer'
+DEFAULT_PATH = 'Server (default)'
 
 
 def _maya_main_window():
@@ -281,7 +282,10 @@ class Installer:
         self.modules = []
         self.icons = []
 
-        self.install_scripts = scripts_path != 'Manually Install'
+        # Define if the icons or scripts should be installed into a
+        # locally defined dir.
+        self.install_scripts = scripts_path != DEFAULT_PATH
+        self.install_icons = icons_path != DEFAULT_PATH
 
         self.src_path: str = install_from['path']
         self.is_local: bool = install_from['is_local']
@@ -406,13 +410,18 @@ class Installer:
             if tool in self.to_install:
                 self.index_files(self.tool_data[tool])
 
-        files = len(self.scripts) + len(self.icons) + len(self.modules)
+        files: int = 0
+        if self.install_icons:
+            files += len(self.icons)
+        if self.install_scripts:
+            files += len(self.scripts) + len(self.modules)
         self.install_steps = files
 
-        self.status_widget.setText('Downloading icons')
-        asyncio.run(
-            self._install_files(self.icons, self.icons_path, 'icons/')
-        )
+        if self.install_icons:
+            self.status_widget.setText('Downloading icons')
+            asyncio.run(
+                self._install_files(self.icons, self.icons_path, 'icons/')
+            )
         if self.install_scripts:
             self.status_widget.setText('Downloading scripts')
             asyncio.run(
@@ -478,6 +487,7 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
             # only set as a default as it's likely these files be up-to-date and
             # be much faster to update from then downloading.
             self._install_local_text.setText(path)
+            self._local_toolbox_dir = path;
             self._install_from_options.setCurrentIndex(1)
             self._fetch_tools_data()
             return
@@ -638,10 +648,17 @@ class InstallerWindow(MayaQWidgetBaseMixin, QDialog):
 
         # Install Type
         self.scripts_install_loc = QComboBox()
+        self.scripts_install_loc.setStatusTip(
+            'Set where all scripts are installed. Default\'s to not installing any for pre installed scripts.'
+            )
         self.icons_install_loc = QComboBox()
+        self.icons_install_loc.setStatusTip(
+            'Set where icons are installed. Default\'s to not installing any for pre installed icons.'
+            )
         self.shelf_name = QLineEdit(placeholderText='CoolTool')
 
-        self.scripts_install_loc.addItem('Manually Install')
+        self.scripts_install_loc.addItem(DEFAULT_PATH)
+        self.icons_install_loc.addItem(DEFAULT_PATH)
 
         # options_layout.addRow(QLabel('Install From'), self._install_from_options)
         options_layout.addRow(QLabel('Scripts Path'), self.scripts_install_loc)
