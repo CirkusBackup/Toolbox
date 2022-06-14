@@ -1,6 +1,6 @@
 global proc RSTessellate(){
     // Dont continue if the redshift plugin cannot load.
-    if (!_rs_enable_plugin()) {
+    if (!RSEnablePlugin()) {
         return;
     }
 

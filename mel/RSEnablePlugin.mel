@@ -2,7 +2,7 @@
 // is then it will attempt to load the plugin if it's not already.
 //
 // Returns either 1 or 0 depending if the plugin is or was loaded successfully.
-global proc int _rs_enable_plugin() {
+global proc int RSEnablePlugin() {
     int $loaded = `pluginInfo -q -loaded "redshift4maya"`;
     if ($loaded) {
         return true;

@@ -1,6 +1,6 @@
 global proc RSObjectId(){
     // Dont continue if the redshift plugin cannot load.
-    if (!_rs_enable_plugin()) {
+    if (!RSEnablePlugin()) {
         return;
     }
 
@@ -21,7 +21,7 @@ global proc RSObjectId(){
 
 global proc assignID () {
     // Dont continue if the redshift plugin cannot load.
-    if (!_rs_enable_plugin()) {
+    if (!RSEnablePlugin()) {
         return;
     }
 
@@ -38,7 +38,7 @@ global proc assignID () {
 
 global proc selectID (){
     // Dont continue if the redshift plugin cannot load.
-    if (!_rs_enable_plugin()) {
+    if (!RSEnablePlugin()) {
         return;
     }
     
