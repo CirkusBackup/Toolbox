@@ -233,7 +233,8 @@ def bifrostCacheString(l):
     pbString += f' -Pool {l.comboBox_layerPool.currentText()}'
     pbString += f' -Range {l.lineEdit_layerRange.text()}'
     pbString += f' -Executable {stf_window.mainWidget.lineEdit_render.text()}'
-    pbString += ' -Paused'
+    if stf_window.mainWidget.checkBox_paused.isChecked():
+        pbString += ' -Paused'
     pbString += f' -Creator {stf_window.mainWidget.lineEdit_name.text()}'
     pbString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
     pbString += f' -Note {stf_window.mainWidget.lineEdit_note.text()}'
@@ -266,7 +267,8 @@ def yetiCacheString(l):
     pbString += f' -Pool {l.comboBox_layerPool.currentText()}'
     pbString += f' -Range {l.lineEdit_layerRange.text()}'
     pbString += f' -Executable {stf_window.mainWidget.lineEdit_render.text()}'
-    pbString += ' -Paused'
+    if stf_window.mainWidget.checkBox_paused.isChecked():
+        pbString += ' -Paused'
     pbString += f' -Creator {stf_window.mainWidget.lineEdit_name.text()}'
     pbString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
     pbString += f' -Note {stf_window.mainWidget.lineEdit_note.text()}'
@@ -296,7 +298,8 @@ def playblastString(l):
     pbString += f' -Pool {l.comboBox_layerPool.currentText()}'
     pbString += f' -Range {l.lineEdit_layerRange.text()}'
     pbString += f' -Executable {stf_window.mainWidget.lineEdit_render.text()}'
-    pbString += ' -Paused'
+    if stf_window.mainWidget.checkBox_paused.isChecked():
+        pbString += ' -Paused'
     pbString += f' -Creator {stf_window.mainWidget.lineEdit_name.text()}'
     pbString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
     pbString += f' -Note {stf_window.mainWidget.lineEdit_note.text()}'
@@ -327,7 +330,8 @@ def renderString(l):
     submitString += f' -Pool {l.comboBox_layerPool.currentText()}'
     submitString += f' -Range {l.lineEdit_layerRange.text()}'
     submitString += f' -Executable \"{stf_window.mainWidget.lineEdit_render.text()}\"'
-    submitString += ' -Paused'
+    if stf_window.mainWidget.checkBox_paused.isChecked():
+        submitString += ' -Paused'
     submitString += f' -Creator \"{stf_window.mainWidget.lineEdit_name.text()}\"'
     submitString += f' -StaggerStart {stf_window.mainWidget.lineEdit_stagger.text()}'
     submitString += f' -Note \"{stf_window.mainWidget.lineEdit_note.text()}\"'
