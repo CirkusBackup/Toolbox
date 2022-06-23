@@ -18,6 +18,9 @@ global proc _multiref_selectFiles() {
 		$filter = "Maya Files (*.ma *.mb);; All Files (*.*)";
 	}
 
+	global int $mref_uniquielyName;
+	$mref_uniquielyName = `checkBox -q -v "multiref_namespaceUniquie"`;
+
 	// Close the old UI.
 	_multiref_cancel();
 
@@ -42,8 +45,14 @@ global proc _multiref_selectFiles() {
 		print ("\n" + "Changed namespace to " + $namespace);
 	}
 
+	// Import files
+	// for (int $i = 0; $i <= size($selected)) {
+	// 	_multiref_import_file($file, $count, $namespace, $i, $useImport)
+	// }
+
 	// Import the files
 	for ($file in $selected) {
+		int $max = 0;
 		_multiref_import_file($file, $count, $namespace, $useImport);
 	}
 	print("\n Done.");
@@ -55,16 +64,24 @@ global proc _multiref_import_file(string $file, int $count, string $namespace, s
 	string $fileTypeData[];
 	int $num = `tokenize $file "//" $fileTypeData`;
 	$name = $fileTypeData[$num - 1];
+	
+	global int $mref_uniquielyName;
+		
+	// Make sure namesapce is uniquie for each import.
+	string $ns = $namespace;
+	if ($mref_uniquielyName) {
+		$ns += "#";
+	}
 
 	for ($i = 0; $i < $count; $i++) {
 		if ($useImport) {
 			// Import the file.
 			print("\n Importing " + $name);
-			file -i -ra true -namespace $namespace -pr -mnc 1 $file;
+			file -i -ra true -namespace $ns -pr -mnc 1 $file;
 		} else {
 			// Reference the file.
 			print("\n Referencing " + $name);
-			file -r -loadReferenceDepth "all" -namespace $namespace -mnc 1 $file;
+			file -r -loadReferenceDepth "all" -namespace $ns -mnc 1 $file;
 		}
 	}
 }
@@ -105,6 +122,9 @@ global proc multiRef() {
 		
 		text -label "Operation		";
 		radioButtonGrp -numberOfRadioButtons 2 -labelArray2 "reference" "import" -select 1 "multiref_importType";
+
+		text -l "Uniquie Names		";
+		checkBox -v 1 -ann "Set if each namespace should have a uniquie name to prevent name collisions." -l "" "multiref_namespaceUniquie";
 		setParent ..;
 
 	text -l "" -h 20;
